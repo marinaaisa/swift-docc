@@ -1,0 +1,108 @@
+/* Block content: paragraphs, parameter and term lists, tables, and asides. */
+
+p {
+  font-size: 17px;
+  line-height: 24px;
+  
+  margin-top: 0.8em;
+}
+
+/* Parameter and term definition lists */
+
+dl {
+  margin-top: 0.85em;
+  
+  dt {
+    font-weight: 600;
+    font-size: 17px;
+    line-height: 25px;
+    font-family: var(--font-mono);
+    padding-left: 17px;
+    padding-top: var(--spacing-param);
+    
+    &:first-child {
+      padding-top: 0;
+    }
+    
+    @media only screen and (max-width: 735px) {
+      padding-left: 0;
+    }
+  }
+  
+  dd {
+    padding-left: 34px;
+    
+    p {
+      margin: 0;
+      line-height: 23px;
+    }
+    
+    @media only screen and (max-width: 735px) {
+      padding-left: 0;
+    }
+  }
+}
+
+table {
+  margin-top: 1.6em;
+  margin-bottom: 1.6em;
+  
+  font-size: 17px;
+  line-height: 25px;
+  
+  border-collapse: collapse;
+  border-spacing: 0;
+  
+  th, td {
+    text-align: start;
+    padding: 10px;
+    
+    border: 1px solid #f0f0f0;
+  }
+  
+  /* No border on the outside of the table */
+  th {
+    border-top: none;
+  }
+  th:first-of-type {
+    border-left: none;
+  }
+  th:last-of-type {
+    border-right: none;
+  }
+  tr:last-of-type > td {
+    border-bottom: none;
+  }
+  
+  tr {
+    td:first-of-type {
+      border-left: none;
+    }
+    td:last-of-type {
+      border-right: none;
+    }
+  }
+}
+
+/* Asides */
+
+aside {
+  background-color: rgb(245, 245, 245);
+  border: 0px solid rgb(102, 102, 102);
+  border-inline-start-width: 6px;
+  
+  border-radius: 4px;
+  padding: 16px;
+  
+  margin-top: 27px;
+  
+  .label {
+    font-weight: 600;
+    margin-top: 0;
+  }
+  
+  
+  &> p:nth-of-type(2) {
+    margin-top: 0.4em;
+  }
+}

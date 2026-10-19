@@ -1,0 +1,77 @@
+/* Declarations and code blocks, including the declaration syntax colors. */
+
+#declaration, pre {
+  margin-top: 40px;
+  
+  background: var(--color-code-background);
+  border-color: var(--color-grid);
+  border-radius: 4px;
+  border-style: solid;
+  border-width: 1px;
+  padding: var(--code-block-style-elements-padding);
+  line-height: 25px;
+  
+  /* We probably don't need most of these colors because they don't appear in declarations */
+  --color-syntax-attributes: rgb(148, 113, 0);
+  --color-syntax-characters: rgb(39, 42, 216);
+  --color-syntax-comments: rgb(112, 127, 140);
+  --color-syntax-deletion: var(--color-figure-red);
+  --color-syntax-documentation-markup: rgb(80, 99, 117);
+  --color-syntax-documentation-markup-keywords: rgb(80, 99, 117);
+  --color-syntax-heading: rgb(186, 45, 162);
+  --color-syntax-highlighted: rgba(0, 113, 227, 0.2);
+  --color-syntax-keywords: rgb(173, 61, 164);
+  --color-syntax-marks: rgb(0, 0, 0);
+  --color-syntax-numbers: rgb(39, 42, 216);
+  --color-syntax-other-class-names: rgb(112, 61, 170);
+  --color-syntax-other-constants: rgb(75, 33, 176);
+  --color-syntax-other-declarations: rgb(4, 124, 176);
+  --color-syntax-other-function-and-method-names: rgb(75, 33, 176);
+  --color-syntax-other-instance-variables-and-globals: rgb(112, 61, 170);
+  --color-syntax-other-preprocessor-macros: rgb(120, 73, 42);
+  --color-syntax-other-type-names: rgb(112, 61, 170);
+  --color-syntax-param-internal-name: rgb(64, 64, 64);
+  --color-syntax-plain-text: rgb(0, 0, 0);
+  --color-syntax-preprocessor-statements: rgb(120, 73, 42);
+  --color-syntax-project-class-names: rgb(62, 128, 135);
+  --color-syntax-project-constants: rgb(45, 100, 105);
+  --color-syntax-project-function-and-method-names: rgb(45, 100, 105);
+  --color-syntax-project-instance-variables-and-globals: rgb(62, 128, 135);
+  --color-syntax-project-preprocessor-macros: rgb(120, 73, 42);
+  --color-syntax-project-type-names: rgb(62, 128, 135);
+  --color-syntax-strings: rgb(209, 47, 27);
+  --color-syntax-type-declarations: rgb(3, 99, 140);
+  --color-syntax-urls: rgb(19, 55, 255);
+  
+  &> code {
+    display: block;
+    
+    font-size: 15px;
+    line-height: 25px;
+    
+    .keyword, .attribute {
+      color: var(--color-syntax-keywords);
+    }
+    .internalParam {
+      color: var(--color-syntax-param-internal-name);
+    }
+    .typeIdentifier {
+      color: var(--color-syntax-other-type-names);
+      &:not(:hover) {
+        text-decoration: none;
+      }
+    }
+  }
+}
+
+pre {
+  margin-top: 2.1em;
+}
+
+/* Scroll the code inside of code blocks */
+pre {
+  overflow: auto;
+  -webkit-overflow-scrolling: auto;
+  white-space: pre;
+  overflow-wrap: normal;
+}

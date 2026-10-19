@@ -193,7 +193,7 @@ let package = Package(
                 .product(name: "Markdown", package: "swift-markdown"),
                 .product(name: "SymbolKit", package: "swift-docc-symbolkit"),
             ],
-            exclude: ["CMakeLists.txt"],
+            exclude: ["CMakeLists.txt", "Styles"],
             swiftSettings: swiftSettings(.v6)
         ),
         .testTarget(

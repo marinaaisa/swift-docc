@@ -1,0 +1,104 @@
+/* Lists of links to other pages: Topics, See Also, and Mentioned In. */
+
+#Topics, #See-Also {
+  &> ul {
+    padding: 0;
+    &> li {
+      margin-top: 15px;
+      list-style: none;
+      &> a {
+        padding: 5px 0;
+        display: inline-flex;
+        
+        text-decoration: none;
+        font-size: 1rem;
+        
+        &:hover {
+          text-decoration: underline;
+        }
+        
+        &> code {
+          font-size: 17px;
+          line-height: 24px;
+          color: rgb(102, 102, 102);
+          
+          &>.identifier {
+            color: var(--color-figure-blue);
+          }
+        }
+      }
+      &> p {
+        margin: 0;
+        margin-inline-start: 2.294em; /* it's defined like this in DocC Render */
+        line-height: 24px;
+      }
+      
+      /* Display icons for articles and API collections */
+      .api-collection, .article {
+        margin-top: 0px; /* avoid the top padding of other paragraphs */
+        
+        &:before {
+          margin-right: 20px;
+          margin-left: 4px;
+          width: 36px;
+          position: relative;
+          top: 2px;
+          content: url(api-collection.svg);
+        }
+      }
+      .article:before {
+        content: url(article.svg)
+      }
+    }
+  }
+  &> h3 {
+    font-size: 24px;
+    line-height: 28px;
+    padding-top: 39px;
+    
+    @media only screen and (max-width: 1250px) {
+      font-size: 21px;
+      line-height: 25px;
+    }
+  }
+  &> h2 {
+    margin-top: 0px;
+  }
+  &> p {
+    margin-top: 15px;
+  }
+}
+
+#Mentioned-In > ul {
+  padding: 0;
+  &> li {
+    margin-top: 10px;
+    list-style: none;
+    &> a {
+      padding: 5px 0;
+      display: inline-flex;
+      
+      text-decoration: none;
+      font-size: 17px;
+      
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+    &> p {
+      margin: 0;
+      margin-inline-start: 2.294em; /* it's defined like this in DocC Render */
+      line-height: 24px;
+    }
+    
+    /* Display an article icons*/
+    &:before {
+      margin-right: 8px;
+      margin-left: 2px;
+      width: 36px;
+      position: relative;
+      top: 2px;
+      content: url(article.svg);
+    }
+  }
+}

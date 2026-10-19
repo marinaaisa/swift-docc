@@ -1,0 +1,30 @@
+/* Custom properties (colors and fonts) shared by the other style sheets. */
+
+:root {
+  --color-header-text: #1d1d1f;
+  --color-code-background: #f7f7f7;
+  --color-secondary-label: #6e6e73;
+  
+  --color-grid: rgb(204, 204, 204);
+  
+  --color-fill-gray: #ccc;
+  --color-fill-gray-quaternary: #f0f0f0;
+  --color-fill-gray-secondary: #f5f5f5;
+  --color-fill-gray-tertiary: #f0f0f0;
+  
+  --color-badge-deprecated: #bf4800;
+  
+  --color-standard-blue: #06c;
+  --color-standard-gray: #afafaf;
+  --color-standard-green: #509ca3;
+  --color-standard-orange: #ff5a00;
+  --color-standard-purple: #bf6af7;
+  --color-standard-red: #d82797;
+  --color-standard-yellow: #ff9f2c;
+  
+  --color-figure-gray-secondary: rgb(102, 102, 102);
+  --color-figure-blue: rgb(51, 102, 255);
+  
+  --font-default: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: Menlo, monospace;
+}

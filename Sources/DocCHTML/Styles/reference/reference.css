@@ -1,0 +1,18 @@
+/*
+ The style sheet that DocC uses to define the layout and appearance of "reference" documentation (symbols and articles).
+
+ `swift bin/minify-static-html-css.swift` bundles these files, in this order, into the single "reference.css" file
+ that DocC writes to the output. Because later rules win when specificity is equal, the order of these imports matters.
+*/
+
+@import "variables.css";
+@import "base.css";
+@import "sections.css";
+@import "headings.css";
+@import "hero.css";
+@import "code.css";
+@import "content.css";
+@import "topics.css";
+@import "inline.css";
+@import "header.css";
+@import "footer.css";

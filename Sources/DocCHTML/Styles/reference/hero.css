@@ -1,0 +1,133 @@
+/* The page's introduction: eyebrow, breadcrumbs, availability, background and icon, and abstract. */
+
+/* The "eyebrow" subheading */
+section:first-of-type > hgroup > p {
+  font-size: 21px;
+  line-height: 25px;
+  margin: 0;
+  margin-bottom: 15px;
+  color: var(--color-figure-gray-secondary);
+  
+  @media only screen and (max-width: 1250px) {
+    font-size: 19px;
+    line-height: 23px;
+  }
+
+  /* Workaround some margin issues with H1 elements in the authored content. */
+  &+ h1 {
+    margin-top: 0;
+  }
+}
+
+#breadcrumbs > ul {
+  padding: 0;
+  margin-bottom: 20px;
+  display: flex;
+  list-style-type: none;
+  
+  &>li {
+    font-size: 14px;
+    line-height: 20px;
+    a {
+      color: #000;
+    }
+    
+    &:not(:first-child):before {
+      content: "/";
+      width: 5px;
+      margin-inline: 5px;
+    }
+  }
+}
+
+#availability {
+  padding: 0;
+  margin-top: 15px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 11px;
+  list-style-type: none;
+  
+  align-items: center;
+  
+  &>li {
+    font-size: 14px;
+    line-height: 20px;
+    height: 20px;
+    
+    &:not(:last-child):after {
+      content: "";
+      display: inline-block;
+      height: 14px;
+      width: 1px;
+      position: relative;
+      top: 2px;
+      margin-left: 10px;
+      
+      background-color: black; /* TODO: dark mode */
+    }
+  }
+}
+
+#hero {
+  margin-bottom: 40px;
+  
+  position: relative;
+  clip-path: inset(0 -50%);
+  
+  /* Draw the background in a pseudo element so that it can move behind the icon */
+  &:before {
+    content: "";
+    background: #f0f0f0;
+    
+    position: absolute;
+    top: 0;
+    left: -50%;
+    width: 200%;
+    height: 100%;
+    z-index: -2;
+  }
+}
+
+/* Add background icons for articles, API collections, and module pages */
+
+#hero.article:after {
+  background: url(article.svg);
+}
+
+#hero.api-collection:after {
+  background: url(api-collection.svg);
+}
+
+#hero.module:after {
+  background: url(module.svg);
+}
+
+#hero.article:after, #hero.api-collection:after, #hero.module:after {
+  content: "";
+  --icon-size: 250px;
+  
+  position: absolute;
+  top: calc(50% - var(--icon-size) / 2);
+  right: 25px;
+  opacity: 0.15;
+  z-index: -1;
+  
+  width: var(--icon-size);
+  height: var(--icon-size);
+  background-size: var(--icon-size) var(--icon-size);
+}
+
+/* Abstract */
+section:first-of-type > p {
+  font-size: 21px;
+  line-height: 29px;
+  
+  margin-top: 12px;
+  
+  @media only screen and (max-width: 735px) {
+    font-size: 19px;
+    line-height: 27px;
+  }
+}

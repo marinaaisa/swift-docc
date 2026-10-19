@@ -1,0 +1,52 @@
+/* Inline content: links, emphasis, superscript, subscript, and code voice. */
+
+/* Links */
+a {
+  color: var(--color-figure-blue);
+}
+
+/* Inline Elements */
+
+b, strong {
+  font-weight: 600;
+}
+
+em, i, cite, dfn {
+  font-style: italic;
+}
+
+sup {
+  font-size: .6em;
+  vertical-align: top;
+  position: relative;
+  bottom: -.2em;
+  
+  h1 &,
+  h2 &,
+  h3 & {
+    font-size: .4em;
+  }
+  
+  a {
+    vertical-align: inherit;
+    color: inherit;
+    
+    &:hover {
+      color: var(--color-figure-blue);
+      text-decoration: none;
+    }
+  }
+}
+
+sub {
+  line-height: 1;
+}
+
+abbr {
+  border: 0;
+}
+
+code {
+  font-weight: inherit;
+  letter-spacing: 0;
+}

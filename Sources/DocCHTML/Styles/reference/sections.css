@@ -1,0 +1,86 @@
+/* The width, padding, and separators of the page's sections. */
+
+section {
+  max-width: 820px;
+  margin: 0 auto;
+  
+  @media only screen and (max-width: 1250px) {
+    padding-left: 80px;
+    padding-right: 80px;
+  }
+  
+  @media only screen and (max-width: 735px) {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  
+  @media only screen and (min-width: 1500px) {
+    max-width: 920px;
+  }
+}
+
+/* Draw a separator between the Topics section and any non-"hero" section (with a background) before it */
+article > section:not(#hero) + #Topics,
+/* Draw a separator between the See Also section and any non-"hero" section (with a background) before it */
+article > section:not(#hero) + #See-Also,
+/* Draw a separator between a symbol's first and second sections */
+article > section:first-of-type:not(#hero) + section
+{
+  &:before {
+    content: "";
+    display: block;
+    width: 100%;
+    background: var(--color-grid);
+    height: 1px;
+    margin-bottom: 40px;
+  }
+}
+
+hr {
+  max-width: 820px;
+  margin: 0 auto;
+  
+  @media only screen and (max-width: 1250px) {
+    max-width: 660px;
+  }
+  
+  @media only screen and (max-width: 820px) {
+    margin: 0 80px;
+  }
+  
+  @media only screen and (max-width: 735px) {
+    margin: 0 20px;
+  }
+  
+  @media only screen and (min-width: 1500px) {
+    max-width: 920px;
+  }
+}
+
+section {
+  box-sizing: border-box;
+
+  padding-top: 40px;
+  padding-bottom: 40px;
+  
+  @media print {
+    padding-left: 80px;
+    padding-right: 80px;
+    max-width: none;
+  }
+}
+
+section + section {
+  /* avoid double padding between sections */
+  padding-top: 0;
+}
+
+hr {
+  border: none;
+  background: var(--color-grid);
+  height: 1px;
+}
+
+section :first-child {
+  margin-top: 0;
+}
