@@ -9,6 +9,8 @@
 */
 
 import struct Foundation.URL
+import struct Foundation.Data
+import class Foundation.JSONEncoder
 import SwiftDocC
 import DocCHTML
 
@@ -48,11 +50,24 @@ struct FullPageHTMLContentConsumer: HTMLContentConsumer {
         metadata: (title: String, description: String?),
         forPage reference: ResolvedTopicReference
     ) throws {
-        let page = HTMLRenderer.makeFullPage(mainContent: mainContent ?? article(contents: []), metadata: metadata, for: reference, customHeader: customHeader, customFooter: customFooter)
+        let page = HTMLRenderer.makeFullPage(mainContent: mainContent ?? article(contents: []), metadata: metadata, for: reference, includesNavigator: true, customHeader: customHeader, customFooter: customFooter)
         
         let htmlData = HTMLFormatter.format(page, options: prettyPrint ? .prettyPrint : [])
         
         let relativeFilePath = NodeURLGenerator.fileSafeReferencePath(reference, lowercased: true) + "/index.html"
         try fileWriter.write(htmlData, toFileSafePath: relativeFilePath)
+    }
+    
+    func consume(navigatorHierarchy: [HTMLRenderer.NavigatorItem]) throws {
+        // Define the hierarchy in a script, rather than in a JSON file, so that the navigator also works when the reader opens the pages directly from disk.
+        // Browsers don't allow pages that are loaded from a "file://" URL to fetch other local files, but they can load local scripts.
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = prettyPrint ? [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes] : [.withoutEscapingSlashes]
+        
+        var data = Data("window.doccNavigatorHierarchy = ".utf8)
+        data.append(try encoder.encode(navigatorHierarchy))
+        data.append(contentsOf: Array(";\n".utf8))
+        
+        try fileWriter.write(data, toFileSafePath: StaticResources.navigatorHierarchyFilename)
     }
 }

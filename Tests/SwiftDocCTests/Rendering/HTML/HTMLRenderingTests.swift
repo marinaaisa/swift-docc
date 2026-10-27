@@ -644,4 +644,96 @@ struct HTMLRenderingTests {
         </article>
         """)
     }
+    
+    @Test
+    func navigatorHierarchyFollowsTopicsSections() async throws {
+        let catalog = Folder(name: "unit-test.docc") {
+            // public struct SomeStruct {
+            //     public func someMethod() {}
+            // }
+            // public struct OtherStruct {}
+            JSONFile(symbolGraph: makeSymbolGraph(moduleName: "ModuleName", symbols: [
+                makeSymbol(id: "some-struct-id",  kind: .struct, pathComponents: ["SomeStruct"]),
+                makeSymbol(id: "some-method-id",  kind: .method, pathComponents: ["SomeStruct", "someMethod()"]),
+                makeSymbol(id: "other-struct-id", kind: .struct, pathComponents: ["OtherStruct"]),
+            ], relationships: [
+                .init("some-method-id", .memberOf, "some-struct-id"),
+            ]))
+            
+            TextFile(name: "ModuleName.md", utf8Content: """
+            # ``ModuleName``
+            
+            Some description of this module.
+            
+            ## Topics
+            
+            ### Essentials
+            
+            - <doc:GettingStarted>
+            """)
+            
+            TextFile(name: "GettingStarted.md", utf8Content: """
+            # Getting Started
+            
+            Some description of this article.
+            """)
+        }
+        
+        let context = try await load(catalog: catalog)
+        #expect(context.diagnostics.isEmpty, "Encountered unexpected problems: \(context.diagnostics.map(\.summary))")
+        
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        let json = String(decoding: try encoder.encode(HTMLRenderer.makeNavigatorHierarchy(context: context)), as: UTF8.self)
+        
+        // The authored "Essentials" group comes before the automatic "Structures" group, like in the module's Topics section.
+        // Default values, like "symbol: false" for the article or an empty list of groups for leaf pages, are omitted.
+        #expect(json == """
+        [
+          {
+            "groups" : [
+              {
+                "items" : [
+                  {
+                    "path" : "documentation/modulename/gettingstarted/index.html",
+                    "title" : "Getting Started"
+                  }
+                ],
+                "title" : "Essentials"
+              },
+              {
+                "items" : [
+                  {
+                    "path" : "documentation/modulename/otherstruct/index.html",
+                    "symbol" : true,
+                    "title" : "OtherStruct"
+                  },
+                  {
+                    "groups" : [
+                      {
+                        "items" : [
+                          {
+                            "path" : "documentation/modulename/somestruct/somemethod()/index.html",
+                            "symbol" : true,
+                            "title" : "someMethod()"
+                          }
+                        ],
+                        "title" : "Instance Methods"
+                      }
+                    ],
+                    "path" : "documentation/modulename/somestruct/index.html",
+                    "symbol" : true,
+                    "title" : "SomeStruct"
+                  }
+                ],
+                "title" : "Structures"
+              }
+            ],
+            "path" : "documentation/modulename/index.html",
+            "symbol" : true,
+            "title" : "ModuleName"
+          }
+        ]
+        """)
+    }
 }

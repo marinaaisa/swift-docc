@@ -83,6 +83,13 @@ package enum ConvertActionConverter {
             }
         }()
         
+        // The navigator sidebar is only part of the full-page output. Other consumers insert the main content into a template that has its own navigation.
+        if let htmlContentConsumer, htmlContentConsumer._isPrimaryOutputFormat {
+            try signposter.withIntervalSignpost("Build navigator hierarchy", id: signposter.makeSignpostID()) {
+                try htmlContentConsumer.consume(navigatorHierarchy: HTMLRenderer.makeNavigatorHierarchy(context: context))
+            }
+        }
+        
         let renderSignpostHandle = signposter.beginInterval("Render", id: signposter.makeSignpostID(), "Render \(context.knownPages.count) pages")
         let featureFlags = context.configuration.featureFlags
         

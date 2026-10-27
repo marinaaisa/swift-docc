@@ -26,6 +26,7 @@ package extension HTMLRenderer {
     ///   - mainContent: The unique rendered documentation content for this page.
     ///   - metadata: The title and plain text description to use as metadata for this page.
     ///   - reference: The reference that the content and metadata is associated with.
+    ///   - includesNavigator: Whether the page includes a navigator sidebar that a script populates from the output's shared navigator hierarchy file.
     ///   - customHeader: A custom HTML header that the renderer will include in the full-page output.
     ///   - customFooter: A custom HTML footer that the renderer will include in the full-page output.
     /// - Returns: A full-page static HTML document.
@@ -33,6 +34,7 @@ package extension HTMLRenderer {
         mainContent: HTMLNode,
         metadata: (title: String, description: String?),
         for reference: ResolvedTopicReference,
+        includesNavigator: Bool = false,
         customHeader: HTMLNode? = nil,
         customFooter: HTMLNode? = nil
     ) -> HTMLNode {
@@ -58,8 +60,13 @@ package extension HTMLRenderer {
                 .name("description"),
             ))
         }
+        if includesNavigator {
+            // Deferred scripts run in order after the browser has parsed the page, so the hierarchy is defined before the navigator script renders it.
+            headElements.append(script(attributes: [.src("\(pathPrefixToArchiveRoot)\(StaticResources.navigatorHierarchyFilename)"), .defer], contents: []))
+            headElements.append(script(attributes: [.src("\(pathPrefixToArchiveRoot)\(StaticResources.navigatorScript.filename)"), .defer], contents: []))
+        }
         
-        // The full page body consists of 5 elements, in order;
+        // The full page body consists of 6 elements, in order;
         var bodyElements: [HTMLNode] = []
         // 1. An optional custom header
         if let customHeader {
@@ -67,10 +74,17 @@ package extension HTMLRenderer {
         }
         
         // 2. The default header
+        var headerTitleElements: [HTMLNode] = []
+        if includesNavigator {
+            // The button that shows and hides the navigator sidebar.
+            // It's hidden until the navigator script runs, so that readers without JavaScript don't see a button that does nothing.
+            headerTitleElements.append(
+                button(attributes: [.type("button"), .id("navigator-toggle"), .ariaControls("navigator"), .ariaExpanded(false), .ariaLabel("Navigator"), .hidden(.hidden)], contents: [])
+            )
+        }
+        headerTitleElements.append(.text("Documentation"))
         bodyElements.append(header(contents: [
-            // FIXME: Make this a button that toggles the navigator sidebar (rdar://177705101)
-            // This is blocked by the sidebar requiring RenderNode input
-            h2(contents: [.text("Documentation")]),
+            h2(contents: headerTitleElements),
             
             // FIXME: Support switching between language representations of the page (rdar://177705327)
             // The rough idea is to use <select> & <option> elements (when there are multiple languages)
@@ -78,10 +92,22 @@ package extension HTMLRenderer {
             span(contents: [.text("Language: Swift")]),
         ]))
         
-        // 3. The unique documentation content for this page
+        // 3. An optional navigator sidebar.
+        //    The navigator script renders the documentation hierarchy inside this element and reveals it.
+        if includesNavigator {
+            bodyElements.append(nav(attributes: [
+                .id("navigator"),
+                .ariaLabel("Documentation"),
+                .data(named: "root", value: pathPrefixToArchiveRoot),
+                .data(named: "current", value: NodeURLGenerator.fileSafeReferencePath(reference, lowercased: true) + "/index.html"),
+                .hidden(.hidden),
+            ], contents: []))
+        }
+        
+        // 4. The unique documentation content for this page
         bodyElements.append(main(contents: [mainContent]))
         
-        // 4. The default footer
+        // 5. The default footer
         bodyElements.append(footer(contents: [
             // FIXME: Interacting with this radio group doesn't change the page's color scheme (rdar://177705056)
             fieldSet(attributes: [.role(.radioGroup)], contents: [
@@ -102,7 +128,7 @@ package extension HTMLRenderer {
             ])
         ]))
         
-        // 5. An optional custom footer
+        // 6. An optional custom footer
         if let customFooter {
             bodyElements.append(customFooter)
         }

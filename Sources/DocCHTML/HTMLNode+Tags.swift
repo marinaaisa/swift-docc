@@ -1086,7 +1086,7 @@ func tr(attributes: [HTMLNode.Attribute] = [], contents: [HTMLNode]) -> HTMLNode
 ///   - attributes: The list of attributes for the new element.
 ///   - contents: The inner contents for the new element.
 /// - Returns: A new `<button>` element.
-func button(attributes: [HTMLNode.Attribute] = [], contents: [HTMLNode]) -> HTMLNode {
+package func button(attributes: [HTMLNode.Attribute] = [], contents: [HTMLNode]) -> HTMLNode {
     ._element(.button, attributes: attributes, contents: contents)
 }
 
@@ -1353,7 +1353,7 @@ func noScript(attributes: [HTMLNode.Attribute] = [], contents: [HTMLNode]) -> HT
 ///   - attributes: The list of attributes for the new element.
 ///   - contents: The inner contents for the new element.
 /// - Returns: A new `<script>` element.
-func script(attributes: [HTMLNode.Attribute] = [], contents: [HTMLNode]) -> HTMLNode {
+package func script(attributes: [HTMLNode.Attribute] = [], contents: [HTMLNode]) -> HTMLNode {
     ._element(.script, attributes: attributes, contents: contents)
 }
 

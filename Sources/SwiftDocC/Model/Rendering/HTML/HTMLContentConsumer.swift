@@ -32,6 +32,13 @@ package protocol HTMLContentConsumer {
         forPage reference: ResolvedTopicReference
     ) throws
     
+    /// Consumes the documentation hierarchy that the navigator sidebar displays.
+    ///
+    /// The conversion only produces a navigator hierarchy for the primary output format, before it produces any page content.
+    ///
+    /// - Parameter navigatorHierarchy: The top-level pages of the documentation hierarchy and, recursively, their children.
+    func consume(navigatorHierarchy: [HTMLRenderer.NavigatorItem]) throws
+    
     // This is not intended to be a long term design for determining which is the primary output format (rdar://177867282)
     // We need to make sure that this short-term workaround isn't surfaced in any `public` API so that we retain the ability to make large design changes.
     var _isPrimaryOutputFormat: Bool { get }

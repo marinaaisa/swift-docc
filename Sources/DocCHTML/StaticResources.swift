@@ -40,6 +40,8 @@ package enum StaticResources {
     
     package static let allFiles = [
         referenceStyleSheet,
+        // Scripts
+        navigatorScript,
         // Page kind icons
         apiCollectionIcon,
         articleIcon,
@@ -841,6 +843,21 @@ body > header {
       content: url(sidebar.svg)
     }
     
+    /* When the page has a navigator, the button that shows and hides it displays the sidebar icon instead. */
+    &:has(#navigator-toggle:not([hidden])):before {
+      content: none;
+    }
+    
+    #navigator-toggle {
+      width: 30px;
+      height: 25px;
+      padding: 0;
+      border: none;
+      background: url(sidebar.svg) no-repeat left center;
+      vertical-align: top;
+      cursor: pointer;
+    }
+    
     margin-left: 22px;
   }
   
@@ -851,6 +868,113 @@ body > header {
     display: inline-block;
     
     margin-right: 22px;
+  }
+}
+
+#navigator {
+  box-sizing: border-box;
+  padding: 16px 12px 32px 22px;
+  font-size: 14px;
+  line-height: 20px;
+  
+  ul {
+    list-style: none;
+    padding: 0;
+    
+    ul {
+      padding-left: 14px;
+    }
+  }
+  
+  li {
+    margin-top: 2px;
+  }
+  
+  li.group {
+    margin-top: 12px;
+    color: var(--color-secondary-label);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  
+  summary {
+    cursor: pointer;
+  }
+  
+  a {
+    color: inherit;
+    text-decoration: none;
+    
+    &:hover {
+      text-decoration: underline;
+    }
+    
+    &[aria-current="page"] {
+      font-weight: 600;
+      color: var(--color-standard-blue);
+    }
+  }
+  
+  code {
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+}
+
+/* On narrow screens, the navigator displays as a drawer that the button in the header shows and hides. */
+@media only screen and (max-width: 1023px) {
+  #navigator {
+    display: none;
+  }
+  
+  body.navigator-open #navigator:not([hidden]) {
+    display: block;
+    position: fixed;
+    inset: 52px auto 0 0;
+    z-index: 4;
+    width: min(300px, 85vw);
+    overflow: auto;
+    
+    border-right: 1px solid var(--color-grid);
+    background-color: white;
+    box-shadow: 0 0 12px rgba(0, 0, 0, 0.15);
+  }
+}
+
+/* On wider screens, the navigator displays in a column next to the page's content, unless the reader collapses it. */
+@media only screen and (min-width: 1024px) {
+  body:not(.navigator-collapsed):has(> #navigator:not([hidden])) {
+    display: grid;
+    grid-template-columns: 300px minmax(0, 1fr);
+    /* Place the main content next to the navigator, in the same row, rather than in the row after it. */
+    grid-auto-flow: row dense;
+    
+    > * {
+      grid-column: 1 / -1;
+    }
+    /* These selectors need to be nested here to have a higher specificity than the selector above, which includes the navigator's "id" */
+    > #navigator {
+      grid-column: 1;
+    }
+    > main {
+      grid-column: 2;
+      /* Keep full-width backgrounds, like the hero section's, from drawing over the navigator */
+      overflow-x: clip;
+    }
+  }
+  
+  #navigator {
+    position: sticky;
+    top: 52px;
+    max-height: calc(100vh - 52px);
+    overflow: auto;
+    border-right: 1px solid var(--color-grid);
+    align-self: start;
+  }
+  
+  body.navigator-collapsed #navigator {
+    display: none;
   }
 }
 
@@ -912,6 +1036,178 @@ body > footer {
     }
   }
 }
+""".utf8))
+    
+    // MARK: Scripts
+    
+    /// The name of the script file that defines the documentation hierarchy for the navigator sidebar.
+    ///
+    /// DocC writes this file during the conversion because its content depends on the documentation that it converts.
+    package static let navigatorHierarchyFilename = "navigator-data.js"
+    
+    /// The script that renders the navigator sidebar from the documentation hierarchy and lets the reader show and hide it.
+    package static let navigatorScript = File(filename: "navigator.js", data: Data("""
+// Renders the navigator sidebar from the documentation hierarchy that DocC defines in "navigator-data.js".
+(() => {
+  "use strict";
+
+  const navigator = document.getElementById("navigator");
+  const toggle = document.getElementById("navigator-toggle");
+  const hierarchy = window.doccNavigatorHierarchy;
+  if (!navigator || !toggle || !Array.isArray(hierarchy)) {
+    return; // Leave the navigator and its button hidden.
+  }
+
+  const pathToRoot = navigator.dataset.root ?? "";
+  const currentPath = navigator.dataset.current;
+
+  // Find the first chain of items from a top-level item to the current page.
+  // A page that's curated in more than one place only expands in its first location.
+  function findTrail(items, trail) {
+    for (const item of items) {
+      trail.push(item);
+      if (item.path === currentPath) {
+        return true;
+      }
+      for (const group of item.groups ?? []) {
+        if (findTrail(group.items, trail)) {
+          return true;
+        }
+      }
+      trail.pop();
+    }
+    return false;
+  }
+  const trail = [];
+  findTrail(hierarchy, trail);
+  const expandedItems = new Set(trail);
+
+  function makeLink(item) {
+    const link = document.createElement("a");
+    link.href = pathToRoot + item.path;
+    if (item.symbol) {
+      const code = document.createElement("code");
+      code.textContent = item.title;
+      link.append(code);
+    } else {
+      link.textContent = item.title;
+    }
+    if (item.path === currentPath) {
+      link.setAttribute("aria-current", "page");
+    }
+    return link;
+  }
+
+  function makeChildList(item) {
+    const list = document.createElement("ul");
+    for (const group of item.groups) {
+      if (group.title) {
+        const title = document.createElement("li");
+        title.className = "group";
+        title.textContent = group.title;
+        list.append(title);
+      }
+      for (const child of group.items) {
+        list.append(makeListItem(child));
+      }
+    }
+    return list;
+  }
+
+  function makeListItem(item) {
+    const listItem = document.createElement("li");
+    const link = makeLink(item);
+    if (!item.groups) {
+      listItem.append(link);
+      return listItem;
+    }
+
+    const details = document.createElement("details");
+    const summary = document.createElement("summary");
+    summary.append(link);
+    details.append(summary);
+
+    if (expandedItems.has(item)) {
+      details.open = true;
+      details.append(makeChildList(item));
+    } else {
+      // Only create the elements for an item's children when the reader expands it, so that large hierarchies stay fast.
+      details.addEventListener("toggle", () => details.append(makeChildList(item)), { once: true });
+    }
+    listItem.append(details);
+    return listItem;
+  }
+
+  const list = document.createElement("ul");
+  for (const item of hierarchy) {
+    list.append(makeListItem(item));
+  }
+  navigator.append(list);
+
+  // On wide screens the navigator is visible unless the reader collapses it. On narrow screens it's hidden unless the reader opens it.
+  const wideScreen = window.matchMedia("(min-width: 1024px)");
+  const collapsedStorageKey = "docc.navigator.collapsed";
+
+  function isNavigatorVisible() {
+    return wideScreen.matches
+      ? !document.body.classList.contains("navigator-collapsed")
+      : document.body.classList.contains("navigator-open");
+  }
+
+  function scrollToCurrentPage() {
+    const currentLink = navigator.querySelector('[aria-current="page"]');
+    if (currentLink) {
+      navigator.scrollTop = currentLink.offsetTop - navigator.clientHeight / 2;
+    }
+  }
+
+  function update() {
+    toggle.setAttribute("aria-expanded", String(isNavigatorVisible()));
+    if (isNavigatorVisible()) {
+      scrollToCurrentPage();
+    }
+  }
+
+  try {
+    if (localStorage.getItem(collapsedStorageKey) === "true") {
+      document.body.classList.add("navigator-collapsed");
+    }
+  } catch {
+    // Some browsers don't allow local storage for pages that are loaded from disk.
+  }
+
+  toggle.addEventListener("click", () => {
+    if (wideScreen.matches) {
+      const isCollapsed = document.body.classList.toggle("navigator-collapsed");
+      try {
+        localStorage.setItem(collapsedStorageKey, String(isCollapsed));
+      } catch {
+        // The preference only lasts for this page.
+      }
+    } else {
+      document.body.classList.toggle("navigator-open");
+    }
+    update();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !wideScreen.matches && document.body.classList.contains("navigator-open")) {
+      document.body.classList.remove("navigator-open");
+      update();
+      toggle.focus();
+    }
+  });
+
+  wideScreen.addEventListener("change", () => {
+    document.body.classList.remove("navigator-open");
+    update();
+  });
+
+  navigator.hidden = false;
+  toggle.hidden = false;
+  update();
+})();
+
 """.utf8))
     
     // MARK: Icons

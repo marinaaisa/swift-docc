@@ -212,19 +212,11 @@ package struct HTMLRenderer {
         }
         
         // Topics
-        if let topics = article.topics {
+        let taskGroupInfo = Self.topicTaskGroups(for: node, context: context)
+        if !taskGroupInfo.isEmpty {
             // TODO: Support language specific topic sections, indicated using @SupportedLanguage directives (rdar://166308418)
-            articleElements.append(contentsOf:
-                renderer.groupedSection(named: "Topics", groups: [
-                    .swift: topics.taskGroups.map { group in
-                        .init(title: group.heading?.title, content: group.content, references: group.links.compactMap {
-                            $0.destination
-                        })
-                    }
-                ])
-            )
+            articleElements.append(contentsOf: renderer.groupedSection(named: "Topics", groups: [.swift: taskGroupInfo]))
         }
-        // Articles don't have _automatic_ topic sections.
         
         // See Also
         if let seeAlso = article.seeAlso {
@@ -374,42 +366,10 @@ package struct HTMLRenderer {
         }
         
         // Topics
-        do {
-            typealias TaskGroupInfo = MarkdownRenderer<ContextLinkProvider>.TaskGroupInfo
-            
+        let taskGroupInfo = Self.topicTaskGroups(for: node, context: context)
+        if !taskGroupInfo.isEmpty {
             // TODO: Support language specific topic sections, indicated using @SupportedLanguage directives (rdar://166308418)
-            var taskGroupInfo = [TaskGroupInfo]()
-            
-            if let authored = symbol.topics?.taskGroups {
-                taskGroupInfo.append(contentsOf: authored.map { group in
-                    .init(title: group.heading?.title, content: group.content, references: group.links.compactMap(\.destination))
-                })
-            }
-            
-            var atBottomGroups = [TaskGroupInfo]()
-            // This poorly named variable only hold either:
-            // - the articles, that appear before the automatic curation, on module pages.
-            // - the default implementations, that appear at the very bottom, for protocol requirement pages.
-            for group in symbol.automaticTaskGroups {
-                let info = TaskGroupInfo(title: group.title, content: [], references: group.references.compactMap(\.absoluteString))
-                if group.renderPositionPreference == .top {
-                    // Append the group without storing it in an intermediate
-                    taskGroupInfo.append(info)
-                } else {
-                    atBottomGroups.append(info)
-                }
-            }
-            
-            if let automatic = try? AutomaticCuration.topics(for: node, withTraits: [.swift, .objectiveC], context: context) {
-                taskGroupInfo.append(contentsOf: automatic.map { group in
-                    .init(title: group.title, content: [], references: group.references.compactMap(\.absoluteString))
-                })
-            }
-            taskGroupInfo.append(contentsOf: consume atBottomGroups)
-            
-            if !taskGroupInfo.isEmpty {
-                articleElements.append(contentsOf: renderer.groupedSection(named: "Topics", groups: [.swift: taskGroupInfo]))
-            }
+            articleElements.append(contentsOf: renderer.groupedSection(named: "Topics", groups: [.swift: taskGroupInfo]))
         }
         
         // Relationships
@@ -463,6 +423,152 @@ package struct HTMLRenderer {
                 plainDescription: symbol.abstract?.plainText
             )
         )
+    }
+    
+    /// Returns the authored and automatic task groups, in display order, that make up the "Topics" section for the given page.
+    private static func topicTaskGroups(for node: DocumentationNode, context: DocumentationContext) -> [MarkdownRenderer<ContextLinkProvider>.TaskGroupInfo] {
+        typealias TaskGroupInfo = MarkdownRenderer<ContextLinkProvider>.TaskGroupInfo
+        
+        if let article = node.semantic as? Article {
+            // Articles don't have _automatic_ topic sections.
+            return article.topics?.taskGroups.map { group in
+                .init(title: group.heading?.title, content: group.content, references: group.links.compactMap(\.destination))
+            } ?? []
+        }
+        
+        guard let symbol = node.semantic as? Symbol else {
+            return []
+        }
+        
+        var taskGroupInfo = [TaskGroupInfo]()
+        
+        if let authored = symbol.topics?.taskGroups {
+            taskGroupInfo.append(contentsOf: authored.map { group in
+                .init(title: group.heading?.title, content: group.content, references: group.links.compactMap(\.destination))
+            })
+        }
+        
+        var atBottomGroups = [TaskGroupInfo]()
+        // This poorly named variable only hold either:
+        // - the articles, that appear before the automatic curation, on module pages.
+        // - the default implementations, that appear at the very bottom, for protocol requirement pages.
+        for group in symbol.automaticTaskGroups {
+            let info = TaskGroupInfo(title: group.title, content: [], references: group.references.compactMap(\.absoluteString))
+            if group.renderPositionPreference == .top {
+                // Append the group without storing it in an intermediate
+                taskGroupInfo.append(info)
+            } else {
+                atBottomGroups.append(info)
+            }
+        }
+        
+        if let automatic = try? AutomaticCuration.topics(for: node, withTraits: [.swift, .objectiveC], context: context) {
+            taskGroupInfo.append(contentsOf: automatic.map { group in
+                .init(title: group.title, content: [], references: group.references.compactMap(\.absoluteString))
+            })
+        }
+        taskGroupInfo.append(contentsOf: consume atBottomGroups)
+        
+        return taskGroupInfo
+    }
+    
+    /// A page in the documentation hierarchy that the navigator sidebar displays.
+    ///
+    /// The static HTML output encodes the entire hierarchy once, into a script file that the navigator sidebar on each page loads and renders.
+    package struct NavigatorItem: Encodable {
+        /// The plain text name of the page.
+        var title: String
+        /// The path to the page's file, relative to the root of the output.
+        var path: String
+        /// Whether or not the page is a symbol, which the navigator displays in "code voice".
+        var isSymbol: Bool
+        /// The page's children, organized into titled groups.
+        var groups: [Group]
+        
+        /// A titled group of child pages in the navigator.
+        struct Group: Encodable {
+            var title: String?
+            var items: [NavigatorItem]
+            
+            func encode(to encoder: any Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                try container.encodeIfPresent(title, forKey: .title)
+                try container.encode(items, forKey: .items)
+            }
+            enum CodingKeys: String, CodingKey {
+                case title, items
+            }
+        }
+        
+        package func encode(to encoder: any Encoder) throws {
+            // Omit default values to keep the size of the encoded hierarchy small.
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(title, forKey: .title)
+            try container.encode(path, forKey: .path)
+            if isSymbol {
+                try container.encode(true, forKey: .isSymbol)
+            }
+            if !groups.isEmpty {
+                try container.encode(groups, forKey: .groups)
+            }
+        }
+        enum CodingKeys: String, CodingKey {
+            case title, path, isSymbol = "symbol", groups
+        }
+    }
+    
+    /// Creates the documentation hierarchy that the navigator sidebar displays, starting from the context's root pages.
+    ///
+    /// The hierarchy follows each page's "Topics" section, so a page that's curated in more than one place appears in each of those places.
+    static func makeNavigatorHierarchy(context: DocumentationContext) -> [NavigatorItem] {
+        func makeItem(for node: DocumentationNode, ancestors: Set<ResolvedTopicReference>) -> NavigatorItem {
+            let ancestors = ancestors.union([node.reference])
+            
+            let groups: [NavigatorItem.Group] = topicTaskGroups(for: node, context: context).compactMap { group in
+                let items = group.references.compactMap { childLink -> NavigatorItem? in
+                    guard let child = pageNode(forLink: childLink, context: context),
+                          // Curation can form cycles. Don't descend into a page that's already one of this page's ancestors.
+                          !ancestors.contains(child.reference)
+                    else {
+                        return nil
+                    }
+                    return makeItem(for: child, ancestors: ancestors)
+                }
+                return items.isEmpty ? nil : .init(title: group.title, items: items)
+            }
+            
+            let title: String = switch node.makeNames(goal: .conciseness) {
+                case .single(.conceptual(let name)), .single(.symbol(let name)):
+                    name
+                case .languageSpecificSymbol(let namesByLanguage):
+                    namesByLanguage[.swift] ?? namesByLanguage.min(by: { $0.key.id < $1.key.id })?.value ?? node.name.plainText
+            }
+            
+            return NavigatorItem(
+                title: title,
+                path: ContextLinkProvider.filePath(for: node.reference),
+                isSymbol: node.semantic is Symbol,
+                groups: groups
+            )
+        }
+        
+        return context.rootModules.compactMap { context.documentationCache[$0] }.map {
+            makeItem(for: $0, ancestors: [])
+        }
+    }
+    
+    /// Returns the documentation node for a resolved link to a page, or `nil` if the link doesn't refer to a local page.
+    private static func pageNode(forLink link: String, context: DocumentationContext) -> DocumentationNode? {
+        guard let url = URL(string: link),
+              url.scheme == "doc",
+              // Links to sections or headings within a page aren't pages in the navigator.
+              url.fragment == nil,
+              let rawBundleID = url.host
+        else {
+            return nil
+        }
+        // TODO: Support external pages in the navigator (rdar://165912415)
+        return context.documentationCache[ResolvedTopicReference(bundleID: .init(rawValue: rawBundleID), path: url.path, fragment: nil, sourceLanguage: .swift /* The reference's language doesn't matter */)]
     }
     
     private func makeDeprecationSummaryAside(for markup: [any Markup]) -> HTMLNode {

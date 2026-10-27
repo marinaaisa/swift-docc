@@ -148,6 +148,10 @@ struct FileWritingHTMLContentConsumer: HTMLContentConsumer {
         let relativeFilePath = NodeURLGenerator.fileSafeReferencePath(reference, lowercased: true) + "/index.html"
         try fileWriter.write(Data(htmlString.utf8), toFileSafePath: relativeFilePath)
     }
+
+    func consume(navigatorHierarchy _: [HTMLRenderer.NavigatorItem]) throws {
+        // This consumer inserts the HTML content into the Swift-DocC Render template, which has its own navigator.
+    }
 }
 
 private extension HTMLNode {

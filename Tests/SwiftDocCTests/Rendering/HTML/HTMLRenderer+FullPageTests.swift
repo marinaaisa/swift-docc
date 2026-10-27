@@ -141,6 +141,27 @@ struct HTMLRenderFullPageTests {
             """)
         }
     }
+    
+    @Test
+    func includesNavigatorInFullPage() async throws {
+        let fullPage = HTMLRenderer.makeFullPage(
+            mainContent: article(contents: [
+                p(contents: [.text("Some documentation")])
+            ]),
+            metadata: (title: "Some title", nil),
+            for: reference,
+            includesNavigator: true
+        )
+        
+        let html = String(decoding: HTMLFormatter.format(fullPage, options: []), as: UTF8.self)
+        
+        // The head loads the hierarchy before the script that renders it, relative to the archive root
+        #expect(html.contains(#"<script src="../../../../navigator-data.js" defer></script><script src="../../../../navigator.js" defer></script></head>"#))
+        // The header has a hidden button that the script reveals to show and hide the navigator
+        #expect(html.contains(#"<header><h2><button type="button" id="navigator-toggle" aria-controls="navigator" aria-expanded="false" aria-label="Navigator" hidden></button>Documentation</h2>"#))
+        // The (initially hidden and empty) navigator is between the header and the main content and knows where the current page is in the hierarchy
+        #expect(html.contains(#"</header><nav id="navigator" aria-label="Documentation" data-root="../../../../" data-current="documentation/modulename/somepage/somemethod(with:and:)/index.html" hidden></nav><main>"#))
+    }
 }
 
 func assert(_ page: HTMLNode, matches expected: String, sourceLocation: SourceLocation = #_sourceLocation) {

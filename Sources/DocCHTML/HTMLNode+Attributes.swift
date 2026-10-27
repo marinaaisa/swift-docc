@@ -47,6 +47,15 @@ extension HTMLNode {
         /// A textual description that can replace the image when it can't be displayed in an `<img>`, `<area>`, or `<input>` element.
         package static func alt(_ description: String) -> Attribute { .init(name: "alt", value: description) }
 
+        /// The identifier of the element whose contents or presence the element controls.
+        package static func ariaControls(_ identifier: String) -> Attribute { .init(name: "aria-controls", value: identifier) }
+
+        /// An indication whether the element that the control owns or controls is expanded or collapsed.
+        package static func ariaExpanded(_ isExpanded: Bool) -> Attribute { .init(name: "aria-expanded", value: isExpanded ? "true" : "false") }
+
+        /// A textual label for an element that doesn't have any visible text that describes it.
+        package static func ariaLabel(_ label: String) -> Attribute { .init(name: "aria-label", value: label) }
+
         /// The type of content that's referenced by the `<link>` element.
         package static func `as`(_ value: As) -> Attribute { .init(name: "as", value: value.rawValue) }
         
@@ -127,6 +136,11 @@ extension HTMLNode {
 
         /// The URL of an `<object>` element's resource.
         package static func data(_ value: String) -> Attribute { .init(name: "data", value: value) } 
+
+        /// Custom data, private to the page, that the page's scripts can access through the element's `dataset` property.
+        ///
+        /// The attribute name is the given name prefixed with "data-".
+        package static func data(named name: String, value: String) -> Attribute { .init(name: "data-\(name)", value: value) }
 
         /// Either the machine-readable representation of a `<time>` element's date-time value or the date-time value associated with an `<ins>` or `<del>` element's change.
         package static func datetime(_ machineReadableRepresentation: String) -> Attribute { .init(name: "datetime", value: machineReadableRepresentation) }
