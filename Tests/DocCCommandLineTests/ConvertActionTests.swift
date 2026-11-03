@@ -2902,7 +2902,7 @@ class ConvertActionTests: XCTestCase {
             ])),
         ])
         
-        func navigatorIndex(outputFormat: Docc.Convert.OutputFormat) async throws -> RenderIndex {
+        func navigatorIndex(outputFormat: Docc.Convert.OutputFormat) async throws -> (RenderIndex, output: TestFileSystem) {
             let fileSystem = try TestFileSystem(folders: [catalog])
             let action = try ConvertAction(
                 documentationBundleURL: catalog.absoluteURL,
@@ -2917,13 +2917,18 @@ class ConvertActionTests: XCTestCase {
                 outputFormat: outputFormat
             )
             _ = try await action.perform(logHandle: .none)
-            return try JSONDecoder().decode(RenderIndex.self, from: fileSystem.contentsOfURL(URL(fileURLWithPath: "/output/index/index.json")))
+            return (try JSONDecoder().decode(RenderIndex.self, from: fileSystem.contentsOfURL(URL(fileURLWithPath: "/output/index/index.json"))), fileSystem)
         }
         
-        let staticHTMLIndex = try await navigatorIndex(outputFormat: .experimentalHTML)
+        let (staticHTMLIndex, staticHTMLOutput) = try await navigatorIndex(outputFormat: .experimentalHTML)
         XCTAssertEqual(staticHTMLIndex.interfaceLanguages["swift"]?.first?.children?.map(\.title), ["Structures", "SomeStruct"])
-        let jsonIndex = try await navigatorIndex(outputFormat: .json)
+        let (jsonIndex, _) = try await navigatorIndex(outputFormat: .json)
         XCTAssertEqual(staticHTMLIndex, jsonIndex)
+        
+        // The navigator sidebar loads the index from a script, so that it also works when the reader opens the pages directly from disk.
+        let indexJSON = try staticHTMLOutput.contentsOfURL(URL(fileURLWithPath: "/output/index/index.json"))
+        let navigatorScript = try String(decoding: staticHTMLOutput.contentsOfURL(URL(fileURLWithPath: "/output/navigator-index.js")), as: UTF8.self)
+        XCTAssertEqual(navigatorScript, "window.doccNavigatorIndex = \(String(decoding: indexJSON, as: UTF8.self));\n")
     }
     
     #endif

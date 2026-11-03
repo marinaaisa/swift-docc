@@ -9,6 +9,7 @@
 */
 
 import struct Foundation.URL
+import struct Foundation.Data
 import SwiftDocC
 import DocCHTML
 
@@ -54,5 +55,13 @@ struct FullPageHTMLContentConsumer: HTMLContentConsumer {
         
         let relativeFilePath = NodeURLGenerator.fileSafeReferencePath(reference, lowercased: true) + "/index.html"
         try fileWriter.write(htmlData, toFileSafePath: relativeFilePath)
+    }
+    
+    /// Writes the navigator index, that Swift-DocC Render's navigator also reads, to a script that the navigator sidebar on each page loads.
+    ///
+    /// - Parameter navigatorIndexJSON: The encoded `RenderIndex` value from the "index/index.json" file.
+    func consume(navigatorIndexJSON: Data) throws {
+        // Pages loaded from a "file://" URL can't fetch the JSON file, but they can load a local script.
+        try fileWriter.write(Data("window.doccNavigatorIndex = ".utf8) + navigatorIndexJSON + Data(";\n".utf8), toFileSafePath: StaticResources.navigatorIndexFilename)
     }
 }

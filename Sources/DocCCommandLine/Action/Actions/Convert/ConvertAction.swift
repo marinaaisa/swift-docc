@@ -445,6 +445,13 @@ public struct ConvertAction: AsyncAction {
         }
         postConversionDiagnostics.append(contentsOf: indexerProblems)
 
+        // The static HTML output's navigator sidebar displays the same index as Swift-DocC Render's navigator.
+        if let fullPageHTMLConsumer = htmlConsumer as? FullPageHTMLContentConsumer,
+           let navigatorIndexJSON = outputFileManager.contents(atPath: temporaryFolder.appendingPathComponent("index/index.json", isDirectory: false).path)
+        {
+            try fullPageHTMLConsumer.consume(navigatorIndexJSON: navigatorIndexJSON)
+        }
+
         benchmark(end: finalizeNavigationIndexMetric)
         
         // Output the diagnostics encountered during the convert process to the user.

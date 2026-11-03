@@ -914,6 +914,14 @@ body > footer {
 }
 """.utf8))
     
+    // MARK: Scripts
+    
+    /// The name of the script file that defines the navigator index for the navigator sidebar.
+    ///
+    /// DocC writes this file during the conversion because its content depends on the documentation that it converts.
+    /// It defines the same navigator index—from the "index/index.json" file—that Swift-DocC Render's navigator reads.
+    package static let navigatorIndexFilename = "navigator-index.js"
+    
     // MARK: Icons
 
     /// The icon that DocC displays for API collection pages and their references in curation or the navigation hierarchy.
