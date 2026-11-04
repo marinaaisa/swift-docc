@@ -58,6 +58,9 @@ package extension HTMLRenderer {
                 .name("description"),
             ))
         }
+        // The navigator script adds a navigator sidebar to the page. Deferred scripts run in order after the browser has parsed the page, so the index is defined before the navigator script renders it.
+        headElements.append(script(attributes: [.src("\(pathPrefixToArchiveRoot)\(StaticResources.navigatorIndexFilename)"), .defer], contents: []))
+        headElements.append(script(attributes: [.src("\(pathPrefixToArchiveRoot)\(StaticResources.navigatorScript.filename)"), .defer], contents: []))
         
         // The full page body consists of 5 elements, in order;
         var bodyElements: [HTMLNode] = []

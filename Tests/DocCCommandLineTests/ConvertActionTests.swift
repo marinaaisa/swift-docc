@@ -2929,6 +2929,9 @@ class ConvertActionTests: XCTestCase {
         let indexJSON = try staticHTMLOutput.contentsOfURL(URL(fileURLWithPath: "/output/index/index.json"))
         let navigatorScript = try String(decoding: staticHTMLOutput.contentsOfURL(URL(fileURLWithPath: "/output/navigator-index.js")), as: UTF8.self)
         XCTAssertEqual(navigatorScript, "window.doccNavigatorIndex = \(String(decoding: indexJSON, as: UTF8.self));\n")
+        
+        let pageHTML = try String(decoding: staticHTMLOutput.contentsOfURL(URL(fileURLWithPath: "/output/documentation/modulename/somestruct/index.html")), as: UTF8.self)
+        XCTAssert(pageHTML.contains(#"<script src="../../../navigator-index.js" defer></script><script src="../../../navigator.js" defer></script>"#))
     }
     
     #endif

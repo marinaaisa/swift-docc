@@ -40,6 +40,8 @@ package enum StaticResources {
     
     package static let allFiles = [
         referenceStyleSheet,
+        // Scripts
+        navigatorScript,
         // Page kind icons
         apiCollectionIcon,
         articleIcon,
@@ -47,6 +49,7 @@ package enum StaticResources {
         // UI element icons
         anchorIcon,
         sidebarIcon,
+        chevronIcon,
     ]
     
     // MARK: Stylesheets
@@ -855,6 +858,182 @@ body > header {
   }
 }
 
+/*
+ The navigator sidebar replicates the appearance of Swift-DocC Render's navigator.
+ Its sizes are the computed values of Swift-DocC Render's styles, which use a 17px root font size.
+ */
+#navigator {
+  --color-navigator-item-hover: rgba(0, 0, 255, 0.05);
+  
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding-top: 10px;
+  border-inline-end: 1px solid var(--color-grid);
+  background: white;
+  font-size: 17px;
+  line-height: 25px;
+  
+  .technology-title {
+    display: flex;
+    margin-inline: 20px;
+    padding: 8px 10px 8px 20px;
+    border-radius: 4px;
+    white-space: nowrap;
+    text-decoration: none;
+    
+    .card-link {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin: 0;
+      padding: 0;
+      color: black;
+      font-size: 19px;
+      line-height: 23px;
+      font-weight: 600;
+    }
+    
+    &:hover {
+      background: var(--color-navigator-item-hover);
+    }
+  }
+  
+  .scroller {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 10px;
+  }
+  
+  .navigator-card-item {
+    display: flex;
+    min-height: 32px;
+    padding-inline: 20px;
+    
+    /* The tree toggle displays a chevron instead of the `<summary>` element's disclosure triangle. */
+    &::-webkit-details-marker {
+      display: none;
+    }
+    
+    &:not(.is-group):hover .head-wrapper {
+      background: var(--color-navigator-item-hover);
+    }
+  }
+  
+  .head-wrapper {
+    position: relative;
+    display: flex;
+    flex: 1;
+    align-items: center;
+    min-width: 0;
+    padding: 5px 20px 5px 0;
+    border-radius: 4px;
+  }
+  
+  .depth-spacer {
+    position: relative;
+    flex: 0 0 auto;
+    align-self: stretch;
+    width: calc(var(--nesting-index) * 15px + 20px);
+  }
+  
+  .tree-toggle {
+    position: absolute;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    padding-inline-end: 5px;
+    cursor: pointer;
+  }
+  
+  .chevron {
+    width: 10px;
+    height: 10px;
+    background: url(chevron.svg) no-repeat center / contain;
+    transition: transform 0.15s ease-in;
+    
+    details[open] > .navigator-card-item & {
+      transform: rotate(90deg);
+    }
+  }
+  
+  .title-container {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+  }
+  
+  .leaf-link {
+    overflow: hidden;
+    color: inherit;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-decoration: none;
+    
+    /* Make the entire row a click target for the link */
+    &:after {
+      content: "";
+      position: absolute;
+      inset: 0;
+    }
+  }
+  
+  .is-group .leaf-link {
+    padding: 0;
+    color: var(--color-figure-gray-secondary);
+    font-size: inherit;
+    line-height: inherit;
+    font-weight: 600;
+    
+    &:after {
+      display: none;
+    }
+  }
+}
+
+/* On narrow screens, the navigator is hidden. */
+@media only screen and (max-width: 1023px) {
+  #navigator {
+    display: none;
+  }
+}
+
+/* Like Swift-DocC Render, the navigator and the page's main content display next to each other. */
+.full-width-container {
+  display: flex;
+  
+  > main {
+    flex: 1;
+    min-width: 0;
+    /* Keep full-width backgrounds, like the hero section's, from drawing over the navigator */
+    overflow-x: clip;
+  }
+}
+
+/* On wider screens, the navigator displays in a column next to the page's content, unless the reader hides it. */
+@media only screen and (min-width: 1024px) {
+  #navigator {
+    /* The same default width as Swift-DocC Render's navigator: 400px, but between 30% and 40% of the window width, up to a 1521px wide window. */
+    flex: none;
+    width: clamp(calc(min(100vw, 1521px) * 0.3), 400px, calc(min(100vw, 1521px) * 0.4));
+    position: sticky;
+    top: 52px;
+    height: calc(100vh - 52px);
+    align-self: flex-start;
+  }
+  
+  @media (min-width: 1521px) {
+    #navigator {
+      width: 543px;
+    }
+  }
+}
+
 body > footer {
   width: 100%;
   height: 63px;
@@ -923,6 +1102,185 @@ body > footer {
     /// It defines the same navigator index—from the "index/index.json" file—that Swift-DocC Render's navigator reads.
     package static let navigatorIndexFilename = "navigator-index.js"
     
+    /// The script that renders the navigator sidebar from the navigator index.
+    package static let navigatorScript = File(filename: "navigator.js", data: Data("""
+// Renders the navigator sidebar from the navigator index that DocC defines in "navigator-index.js".
+//
+// This replicates the tree, mouse, and keyboard behaviors of Swift-DocC Render's navigator.
+// See "NavigatorCard.vue", "NavigatorCardItem.vue", "TopicTypeIcon.vue", and "navigatorData.js" in the swift-docc-render repository.
+(() => {
+  const index = window.doccNavigatorIndex;
+  if (!index) {
+    return;
+  }
+  
+  const INDEX_ROOT_KEY = "<root>";
+  
+  // This script is in the root of the output.
+  const rootURL = new URL(".", document.currentScript.src);
+  
+  // Returns the navigator index path, for example "/documentation/mykit/myclass", of a link to a page in this output.
+  function indexPathForLink(href) {
+    const path = new URL(href, location.href).pathname.slice(rootURL.pathname.length).replace(/[/]?(index[.]html)?$/, "");
+    return "/" + decodeURIComponent(path).toLowerCase();
+  }
+  const currentPath = indexPathForLink(location.href);
+  
+  // Returns the link to a page's file, without encoding characters that are common in symbol names, like ":" or "(".
+  function hrefForPath(path) {
+    const components = path.split("/").filter(Boolean).map((component) => encodeURI(component).replace(/[#?]/g, encodeURIComponent));
+    return rootURL.href + components.join("/") + "/index.html";
+  }
+  
+  // MARK: Navigator data
+  
+  const languages = index.interfaceLanguages;
+  const modules = languages.swift?.length ? languages.swift : Object.values(languages).find((modules) => modules.length);
+  // In rare cases there are multiple top-level roots. Prefer the one whose path matches the current page.
+  const rootPath = currentPath.split("/").slice(0, 3).join("/");
+  const rootModule = modules?.find(({ path }) => path?.toLowerCase() === rootPath) ?? modules?.[0];
+  if (!rootModule?.children?.length) {
+    return;
+  }
+  const technologyPath = rootModule.path.toLowerCase();
+  
+  // All the items, in the order that the navigator displays them. An item's position in this list is its unique identifier.
+  const children = [];
+  function flattenNestedData(nodes, parent, depth) {
+    nodes.forEach(({ children: nodeChildren, ...node }) => {
+      Object.assign(node, {
+        uid: children.length,
+        parent: parent?.uid ?? INDEX_ROOT_KEY,
+        depth,
+        childUIDs: [],
+      });
+      parent?.childUIDs.push(node.uid);
+      children.push(node);
+      flattenNestedData(nodeChildren ?? [], node, depth + 1);
+    });
+  }
+  flattenNestedData(rootModule.children, null, 0);
+  
+  const getChildren = (uid) => uid === INDEX_ROOT_KEY
+    ? children.filter(({ parent }) => parent === INDEX_ROOT_KEY)
+    : children[uid].childUIDs.map((child) => children[child]);
+  // Returns the item and all its descendants, depth first.
+  const getAllChildren = (uid) => [children[uid], ...children[uid].childUIDs.flatMap(getAllChildren)];
+  
+  // MARK: Rendering
+  
+  // Each item is a row, a `<summary>` inside a `<details>` element for items with children, and a `<div>` for other items.
+  // The script only creates an item's children when the reader first opens it, so that large hierarchies stay fast.
+  // The script keeps an item's elements on the item, once it creates them.
+  const isOpen = (item) => !!item.details?.open;
+  
+  function makeRow(item) {
+    const isGroupMarker = item.type === "groupMarker";
+    const isParent = item.childUIDs.length > 0;
+    
+    const row = document.createElement(isParent ? "summary" : "div");
+    row.className = "navigator-card-item";
+    row.classList.toggle("is-group", isGroupMarker);
+    row.style.setProperty("--nesting-index", item.depth);
+    row.dataset.uid = item.uid;
+    row.innerHTML = `<div class="head-wrapper"><div class="depth-spacer">${isParent ? `<span class="tree-toggle"><span class="chevron"></span></span>` : ""}</div><div class="title-container"></div></div>`;
+    
+    const titleContainer = row.querySelector(".title-container");
+    
+    const link = document.createElement(isGroupMarker ? "h3" : "a");
+    link.className = "leaf-link";
+    if (!isGroupMarker) {
+      link.href = hrefForPath(item.path);
+    }
+    link.textContent = item.title;
+    titleContainer.append(link);
+    
+    if (!isParent) {
+      return row;
+    }
+    item.details = document.createElement("details");
+    item.details.append(row);
+    return item.details;
+  }
+  
+  const appendRows = (container, items) => container.append(...items.map(makeRow));
+  
+  // MARK: Toggling
+  
+  // Opens or closes an item, which creates the item's children the first time it opens.
+  function setOpen(item, isOpen) {
+    const { details } = item;
+    if (!details) {
+      return;
+    }
+    if (isOpen && details.children.length === 1) {
+      appendRows(details, getChildren(item.uid));
+    }
+    details.open = isOpen;
+  }
+  
+  // Opens or closes an item and all of its children.
+  function setFullTreeOpen(item, isOpen) {
+    for (const descendant of getAllChildren(item.uid)) {
+      setOpen(descendant, isOpen);
+    }
+  }
+  
+  function toggleNode(item) {
+    if (!isOpen(item)) {
+      setOpen(item, true);
+    } else {
+      // Like Swift-DocC Render, closing an item also closes all of its children.
+      setFullTreeOpen(item, false);
+    }
+  }
+  
+  const technologyTitle = document.createElement("a");
+  technologyTitle.className = "technology-title";
+  technologyTitle.href = hrefForPath(technologyPath);
+  technologyTitle.innerHTML = `<h2 class="card-link"></h2>`;
+  technologyTitle.firstChild.textContent = rootModule.title;
+  
+  const scroller = document.createElement("div");
+  scroller.className = "scroller";
+  
+  // Like Swift-DocC Render, the navigator and the page's main content go in a container below the page's header.
+  const navigator = document.createElement("nav");
+  navigator.id = "navigator";
+  navigator.setAttribute("aria-label", "Documentation Navigator");
+  navigator.append(technologyTitle, scroller);
+  const main = document.querySelector("body > main");
+  const container = document.createElement("div");
+  container.className = "full-width-container";
+  main.before(container);
+  container.append(navigator, main);
+  
+  // MARK: Interaction
+  
+  const itemForEvent = (event) => children[event.target.closest(".navigator-card-item")?.dataset.uid];
+  scroller.addEventListener("click", (event) => {
+    const item = itemForEvent(event);
+    if (!item) {
+      return;
+    }
+    // Keyboards and assistive technologies activate a `<summary>` element with a click on the element itself.
+    const isTreeToggle = event.target.closest(".tree-toggle") || (event.target.localName === "summary" && event.detail === 0);
+    if (!event.target.closest(".leaf-link")) {
+      // The script toggles the items itself, rather than letting the `<summary>` element toggle them, to close their children.
+      event.preventDefault();
+    }
+    if (isTreeToggle) {
+      toggleNode(item);
+    }
+  });
+  
+  // MARK: Initial state
+  
+  appendRows(scroller, getChildren(INDEX_ROOT_KEY));
+})();
+
+""".utf8))
+    
     // MARK: Icons
 
     /// The icon that DocC displays for API collection pages and their references in curation or the navigation hierarchy.
@@ -967,5 +1325,13 @@ body > footer {
   <path d="M14.41,9.82s0,0,0,0l-4.22-4.22h0l-.53,.53-.53,.53h0l4.22,4.22c.29,.29,.29,.77,0,1.06l-1.4,1.4-.91,.91-.58,.58-.55,.55h0l-2.9,2.9c-.29,.29-.77,.29-1.06,0L1.73,14.04c-.29-.29-.29-.77,0-1.06l2.9-2.9c-.14-.24-.24-.49-.31-.75-.08-.32-.11-.64-.09-.97L.68,11.93c-.87,.87-.87,2.3,0,3.17l4.22,4.22c.87,.87,2.3,.87,3.17,0l3.55-3.55,1.38-1.38,1.4-1.4c.47-.47,.68-1.09,.64-1.7-.02-.29-.09-.58-.21-.84-.11-.22-.24-.44-.43-.62Z"/>
 </svg>
 """.utf8))
+
+    /// The icon that DocC displays next to items in the navigator sidebar that have children, which rotates when the item opens.
+    static let chevronIcon = File(filename: "chevron.svg", data: Data("""
+<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="10px" height="10px" viewBox="0 0 14 14">
+  <path d="M2.964 1.366l0.649-0.76 7.426 6.343-7.423 6.445-0.655-0.755 6.545-5.683-6.542-5.59z"/>
+</svg>
+""".utf8))
+
 
 }

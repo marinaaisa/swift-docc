@@ -40,6 +40,8 @@ struct HTMLRenderFullPageTests {
             <link href="../../../../reference.css" rel="stylesheet">
             <title>Some title</title>
             <meta content="Some description" name="description">
+            <script src="../../../../navigator-index.js" defer></script>
+            <script src="../../../../navigator.js" defer></script>
           </head>
           <body>
             <header>
@@ -106,6 +108,8 @@ struct HTMLRenderFullPageTests {
                 <meta content="width=device-width,initial-scale=1,viewport-fit=cover" name="viewport">
                 <link href="../../../../reference.css" rel="stylesheet">
                 <title>Some title</title>
+                <script src="../../../../navigator-index.js" defer></script>
+                <script src="../../../../navigator.js" defer></script>
               </head>
               <body>
                 <header>A custom header</header>
