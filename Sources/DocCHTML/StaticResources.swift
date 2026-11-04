@@ -845,6 +845,21 @@ body > header {
       content: url(sidebar.svg)
     }
     
+    /* When the page has a navigator, the button that shows and hides it displays the sidebar icon instead. */
+    &:has(#navigator-toggle):before {
+      content: none;
+    }
+    
+    #navigator-toggle {
+      width: 30px;
+      height: 25px;
+      padding: 0;
+      border: none;
+      background: url(sidebar.svg) no-repeat left center;
+      vertical-align: top;
+      cursor: pointer;
+    }
+    
     margin-left: 22px;
   }
   
@@ -998,7 +1013,7 @@ body > header {
 
 /* On narrow screens, the navigator is hidden. */
 @media only screen and (max-width: 1023px) {
-  #navigator {
+  #navigator, #navigator-toggle {
     display: none;
   }
 }
@@ -1031,6 +1046,15 @@ body > header {
     #navigator {
       width: 543px;
     }
+  }
+  
+  /* Like Swift-DocC Render, the navigator takes no space when the reader hides it. */
+  body.navigator-collapsed #navigator {
+    width: 0;
+    /* The navigator's border doesn't take up space either. */
+    margin-inline-end: -1px;
+    visibility: hidden;
+    pointer-events: none;
   }
 }
 
@@ -1102,7 +1126,7 @@ body > footer {
     /// It defines the same navigator index—from the "index/index.json" file—that Swift-DocC Render's navigator reads.
     package static let navigatorIndexFilename = "navigator-index.js"
     
-    /// The script that renders the navigator sidebar from the navigator index.
+    /// The script that renders the navigator sidebar from the navigator index and lets the reader show and hide it.
     package static let navigatorScript = File(filename: "navigator.js", data: Data("""
 // Renders the navigator sidebar from the navigator index that DocC defines in "navigator-index.js".
 //
@@ -1130,6 +1154,13 @@ body > footer {
   function hrefForPath(path) {
     const components = path.split("/").filter(Boolean).map((component) => encodeURI(component).replace(/[#?]/g, encodeURIComponent));
     return rootURL.href + components.join("/") + "/index.html";
+  }
+  
+  // Some browsers don't allow storage for pages that are loaded from disk. Then the navigator's state only lasts for the page.
+  function withStorage(body) {
+    try {
+      return body();
+    } catch {}
   }
   
   // MARK: Navigator data
@@ -1244,7 +1275,7 @@ body > footer {
   const scroller = document.createElement("div");
   scroller.className = "scroller";
   
-  // Like Swift-DocC Render, the navigator and the page's main content go in a container below the page's header.
+  // Like Swift-DocC Render, the navigator and the page's main content go in a container below the page's header, and the button that shows and hides the navigator goes in the header.
   const navigator = document.createElement("nav");
   navigator.id = "navigator";
   navigator.setAttribute("aria-label", "Documentation Navigator");
@@ -1254,6 +1285,11 @@ body > footer {
   container.className = "full-width-container";
   main.before(container);
   container.append(navigator, main);
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.id = "navigator-toggle";
+  toggle.setAttribute("aria-controls", navigator.id);
+  document.querySelector("body > header h2").prepend(toggle);
   
   // MARK: Interaction
   
@@ -1277,6 +1313,27 @@ body > footer {
   // MARK: Initial state
   
   appendRows(scroller, getChildren(INDEX_ROOT_KEY));
+  
+  // MARK: Showing and hiding the navigator
+  
+  // The navigator is visible unless the reader hides it.
+  const collapsedStorageKey = "docc.navigator.collapsed";
+  
+  function updateToggle() {
+    const isVisible = !document.body.classList.contains("navigator-collapsed");
+    toggle.setAttribute("aria-expanded", isVisible);
+    toggle.setAttribute("aria-label", isVisible ? "Close Documentation Navigator" : "Open Documentation Navigator");
+  }
+  
+  document.body.classList.toggle("navigator-collapsed", withStorage(() => localStorage.getItem(collapsedStorageKey)) === "true");
+  
+  toggle.addEventListener("click", () => {
+    const isCollapsed = document.body.classList.toggle("navigator-collapsed");
+    withStorage(() => localStorage.setItem(collapsedStorageKey, isCollapsed));
+    updateToggle();
+  });
+  
+  updateToggle();
 })();
 
 """.utf8))
