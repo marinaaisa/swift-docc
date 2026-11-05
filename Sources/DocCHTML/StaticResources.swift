@@ -985,6 +985,7 @@ body > header {
     display: flex;
     min-height: 32px;
     padding-inline: 20px;
+    outline: none;
     
     /* The tree toggle displays a chevron instead of the `<summary>` element's disclosure triangle. */
     &::-webkit-details-marker {
@@ -1008,6 +1009,11 @@ body > header {
     min-width: 0;
     padding: 5px 20px 5px 0;
     border-radius: 4px;
+    
+    &:has(:focus-visible) {
+      outline: 4px solid rgba(0, 125, 250, 0.6);
+      outline-offset: -4px;
+    }
   }
   
   .depth-spacer {
@@ -1095,6 +1101,7 @@ body > header {
     text-overflow: ellipsis;
     white-space: nowrap;
     text-decoration: none;
+    outline: none;
     
     &.bolded {
       font-weight: 600;
@@ -1349,10 +1356,12 @@ figcaption {
   // All the items, in the order that the navigator displays them. An item's position in this list is its unique identifier.
   const children = [];
   function flattenNestedData(nodes, parent, depth, parentBetaStatus) {
-    nodes.forEach(({ children: nodeChildren, ...node }) => {
+    nodes.forEach(({ children: nodeChildren, ...node }, position) => {
       Object.assign(node, {
         uid: children.length,
         parent: parent?.uid ?? INDEX_ROOT_KEY,
+        index: position,
+        siblingsCount: nodes.length,
         depth,
         childUIDs: [],
         // If the parent or the entire technology is marked as "Beta", the child elements don't get marked as "Beta".
@@ -1431,6 +1440,7 @@ figcaption {
   function makeRow(item) {
     const isGroupMarker = item.type === "groupMarker";
     const isParent = item.childUIDs.length > 0;
+    const labelID = `navigator-${item.uid}-label`;
     
     const row = document.createElement(isParent ? "summary" : "div");
     row.className = "navigator-card-item";
@@ -1438,12 +1448,17 @@ figcaption {
     row.classList.toggle("active", item.uid === activeUID);
     row.style.setProperty("--nesting-index", item.depth);
     row.dataset.uid = item.uid;
-    row.innerHTML = `<div class="head-wrapper"><div class="depth-spacer">${isParent ? `<span class="tree-toggle"><span class="chevron"></span></span>` : ""}</div><div class="title-container"></div></div>`;
+    // The reader moves the focus between the items' links with the arrow keys.
+    row.tabIndex = -1;
+    row.innerHTML = `<div class="head-wrapper"><div class="depth-spacer">${isParent ? `<span class="tree-toggle"><span class="chevron"></span></span>` : ""}</div><div class="title-container"><span hidden id="${labelID}"></span></div></div>`;
     if (!isGroupMarker) {
       row.querySelector(".depth-spacer").after(makeIcon(item));
     }
     
+    const parentTitle = children[item.parent]?.title ?? rootModule.title;
     const titleContainer = row.querySelector(".title-container");
+    titleContainer.firstChild.textContent = `${item.index + 1} of ${item.siblingsCount} symbols inside ${parentTitle}`
+      + (isParent ? ` containing ${item.childUIDs.length === 1 ? "one symbol" : `${item.childUIDs.length} symbols`}` : "");
     
     const link = document.createElement(isGroupMarker ? "h3" : "a");
     link.className = "leaf-link";
@@ -1455,12 +1470,14 @@ figcaption {
     if (item.uid === activeUID && item.path?.toLowerCase() === currentPath) {
       link.setAttribute("aria-current", "page");
     }
+    link.tabIndex = -1;
+    link.setAttribute("aria-describedby", `${labelID} navigator-usage`);
     link.textContent = item.title;
     titleContainer.append(link);
     if (item.deprecated || item.beta) {
       titleContainer.append(makeBadge(item.deprecated ? "deprecated" : "beta"));
     }
-    item.row = row;
+    Object.assign(item, { row, link });
     
     if (!isParent) {
       return row;
@@ -1483,6 +1500,12 @@ figcaption {
     if (shouldOpen && details.children.length === 1) {
       appendRows(details, getChildren(item.uid));
     }
+    // If the link that the reader can focus with the Tab key is inside the closed item, the item's own link takes its place.
+    const tabbableLink = details.querySelector('.leaf-link[tabindex="0"]');
+    if (!shouldOpen && tabbableLink && tabbableLink !== item.link) {
+      tabbableLink.tabIndex = -1;
+      item.link.tabIndex = 0;
+    }
     details.open = shouldOpen;
   }
   
@@ -1493,12 +1516,13 @@ figcaption {
     }
   }
   
-  function toggleNode(item) {
-    if (!isOpen(item)) {
-      setOpen(item, true);
+  function toggleNode(item, fullTree = false) {
+    const shouldOpen = !isOpen(item);
+    // Closing an item also closes all of its children.
+    if (fullTree || !shouldOpen) {
+      setFullTreeOpen(item, shouldOpen);
     } else {
-      // Closing an item also closes all of its children.
-      setFullTreeOpen(item, false);
+      setOpen(item, true);
     }
   }
   
@@ -1516,6 +1540,10 @@ figcaption {
   
   const scroller = document.createElement("div");
   scroller.className = "scroller";
+  const usageLabel = document.createElement("span");
+  usageLabel.hidden = true;
+  usageLabel.id = "navigator-usage";
+  usageLabel.textContent = "To navigate the symbols, press Up Arrow, Down Arrow, Left Arrow or Right Arrow";
   
   // On narrow screens, the navigator has a title and a button that closes it.
   const head = document.createElement("div");
@@ -1527,7 +1555,7 @@ figcaption {
   const navigator = document.createElement("nav");
   navigator.id = "navigator";
   navigator.setAttribute("aria-label", "Documentation Navigator");
-  navigator.append(head, technologyTitle, scroller);
+  navigator.append(head, technologyTitle, scroller, usageLabel);
   const container = document.querySelector("body > .full-width-container");
   const main = container.querySelector(":scope > main");
   main.before(navigator);
@@ -1555,6 +1583,59 @@ figcaption {
   // MARK: Interaction
   
   const itemForEvent = (event) => children[event.target.closest(".navigator-card-item")?.dataset.uid];
+  // The links of the items inside open items, in the order that the navigator displays them.
+  const visibleLinks = () => [...scroller.querySelectorAll(".leaf-link")].filter((link) => link.checkVisibility());
+  
+  // The link that has the focus is the only link that the reader can focus with the Tab key.
+  // When an item's row gets the focus, for example when the reader clicks its toggle, its link gets the focus instead.
+  scroller.addEventListener("focusin", (event) => {
+    const item = itemForEvent(event);
+    if (event.target !== item?.link) {
+      item?.link.focus({ preventScroll: true });
+      return;
+    }
+    scroller.querySelector('.leaf-link[tabindex="0"]')?.setAttribute("tabindex", "-1");
+    item.link.tabIndex = 0;
+    item.row.scrollIntoView({ block: "nearest" });
+  });
+  
+  scroller.addEventListener("keydown", (event) => {
+    const item = itemForEvent(event);
+    if (!item) {
+      return;
+    }
+    const hasModifiers = event.metaKey || event.ctrlKey || event.shiftKey;
+    const isDown = event.key === "ArrowDown";
+    switch (event.key) {
+      case "ArrowUp":
+      case "ArrowDown":
+        if (event.altKey || !hasModifiers) {
+          event.preventDefault();
+          // Option-Up and Option-Down move the focus to the first and last item.
+          const links = visibleLinks();
+          links[event.altKey ? (isDown ? links.length - 1 : 0) : links.indexOf(item.link) + (isDown ? 1 : -1)]?.focus({ preventScroll: true });
+        }
+        break;
+      case "ArrowLeft":
+        event.preventDefault();
+        // Close the item or, if it's already closed, move the focus to its parent.
+        if (isOpen(item)) {
+          toggleNode(item);
+        } else {
+          children[item.parent]?.link.focus({ preventScroll: true });
+        }
+        break;
+      case "ArrowRight":
+        event.preventDefault();
+        if (event.altKey) {
+          toggleNode(item, true);
+        } else if (!hasModifiers && !isOpen(item)) {
+          setOpen(item, true);
+        }
+        break;
+    }
+  });
+  
   scroller.addEventListener("click", (event) => {
     const item = itemForEvent(event);
     if (!item) {
@@ -1578,6 +1659,8 @@ figcaption {
   for (const uid of activePathUIDs) {
     setOpen(children[uid], true);
   }
+  // The active item is the one that the reader can focus with the Tab key.
+  (children[activeUID]?.link ?? scroller.querySelector(".leaf-link")).tabIndex = 0;
   
   // MARK: Showing and hiding the navigator
   
