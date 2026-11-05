@@ -1377,6 +1377,7 @@ figcaption {
   const getChildren = (uid) => uid === INDEX_ROOT_KEY
     ? children.filter(({ parent }) => parent === INDEX_ROOT_KEY)
     : children[uid].childUIDs.map((child) => children[child]);
+  const getSiblings = (uid) => getChildren(children[uid].parent);
   // Returns the item and all its descendants, depth first.
   const getAllChildren = (uid) => [children[uid], ...children[uid].childUIDs.flatMap(getAllChildren)];
   // Returns the item and all its ancestors, starting from the top-level ancestor.
@@ -1429,6 +1430,7 @@ figcaption {
   const breadcrumbs = [...document.querySelectorAll("#breadcrumbs a[href]")].map((link) => indexPathForLink(link.href));
   const activeUID = pathsToFlatChildren([...breadcrumbs.slice(1), currentPath]).pop()?.uid ?? null;
   const activePathUIDs = new Set(getParents(activeUID).map(({ uid }) => uid));
+  let allNodesToggled = false;
   
   // MARK: Rendering
   
@@ -1509,7 +1511,7 @@ figcaption {
     details.open = shouldOpen;
   }
   
-  // Opens or closes an item and all of its children.
+  // Opens or closes an item and all of its children, for example when the reader Option-clicks it.
   function setFullTreeOpen(item, shouldOpen) {
     for (const descendant of getAllChildren(item.uid)) {
       setOpen(descendant, shouldOpen);
@@ -1524,6 +1526,18 @@ figcaption {
     } else {
       setOpen(item, true);
     }
+  }
+  
+  // Toggles an item and all of its siblings open or closed (Command-click).
+  function toggleSiblings(item) {
+    const shouldOpen = !isOpen(item);
+    getSiblings(item.uid).forEach((sibling) => shouldOpen ? setOpen(sibling, true) : setFullTreeOpen(sibling, false));
+  }
+  
+  // Toggles all items open or closed (Option-click on the technology title).
+  function toggleAllNodes() {
+    allNodesToggled = !allNodesToggled;
+    getChildren(INDEX_ROOT_KEY).forEach((item) => setFullTreeOpen(item, allNodesToggled));
   }
   
   const technologyTitle = document.createElement("a");
@@ -1643,12 +1657,24 @@ figcaption {
     }
     // Keyboards and assistive technologies activate a `<summary>` element with a click on the element itself.
     const isTreeToggle = event.target.closest(".tree-toggle") || (event.target.localName === "summary" && event.detail === 0);
-    if (!event.target.closest(".leaf-link")) {
-      // The script toggles the items itself, rather than letting the `<summary>` element toggle them, to close their children.
+    const hasOtherModifiers = event.ctrlKey || event.shiftKey;
+    if (event.altKey || !event.target.closest(".leaf-link")) {
+      // The script toggles the items itself, rather than letting the `<summary>` element toggle them, to support the modifier keys and to close their children.
       event.preventDefault();
     }
-    if (isTreeToggle) {
+    if (event.altKey) {
+      toggleNode(item, true);
+    } else if (isTreeToggle && event.metaKey) {
+      toggleSiblings(item);
+    } else if (isTreeToggle && !hasOtherModifiers) {
       toggleNode(item);
+    }
+  });
+  
+  technologyTitle.addEventListener("click", (event) => {
+    if (event.altKey) {
+      event.preventDefault();
+      toggleAllNodes();
     }
   });
   
