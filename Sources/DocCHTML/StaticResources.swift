@@ -46,6 +46,27 @@ package enum StaticResources {
         apiCollectionIcon,
         articleIcon,
         moduleIcon,
+        // Navigator sidebar icons
+        classIcon,
+        dictionaryIcon,
+        enumerationIcon,
+        extensionIcon,
+        functionIcon,
+        learnIcon,
+        macroIcon,
+        methodIcon,
+        namespaceIcon,
+        operatorIcon,
+        propertyIcon,
+        propertyListKeyIcon,
+        protocolIcon,
+        sampleCodeIcon,
+        structureIcon,
+        subscriptIcon,
+        tutorialIcon,
+        typeAliasIcon,
+        unionIcon,
+        variableIcon,
         // UI element icons
         anchorIcon,
         sidebarIcon,
@@ -1118,6 +1139,41 @@ body > header {
         &:is(:hover, :focus-visible):after {
           background: var(--color-navigator-item-hover);
         }
+        
+        /* The icon for the item's type. Each type's icon is an SVG file, so that a custom style sheet can replace it. Other types use the API collection icon. */
+        &[data-type="article"] { --navigator-icon: url(article.svg); }
+        &[data-type="case"], &[data-type="enum"], &[data-type="httpRequest"] { --navigator-icon: url(enumeration.svg); }
+        &[data-type="class"] { --navigator-icon: url(class.svg); }
+        &[data-type="dictionarySymbol"] { --navigator-icon: url(dictionary.svg); }
+        &[data-type="extension"] { --navigator-icon: url(extension.svg); }
+        &[data-type="func"] { --navigator-icon: url(function.svg); }
+        &[data-type="init"], &[data-type="method"] { --navigator-icon: url(method.svg); }
+        &[data-type="learn"], &[data-type="overview"], &[data-type="resources"] { --navigator-icon: url(learn.svg); }
+        &[data-type="macro"] { --navigator-icon: url(macro.svg); }
+        &[data-type="module"] { --navigator-icon: url(module.svg); }
+        &[data-type="namespace"] { --navigator-icon: url(namespace.svg); }
+        &[data-type="op"] { --navigator-icon: url(operator.svg); }
+        &[data-type="project"], &[data-type="tutorial"] { --navigator-icon: url(tutorial.svg); }
+        &[data-type="property"] { --navigator-icon: url(property.svg); }
+        &[data-type="propertyListKey"], &[data-type="propertyListKeyReference"] { --navigator-icon: url(property-list-key.svg); }
+        &[data-type="protocol"] { --navigator-icon: url(protocol.svg); }
+        &[data-type="sampleCode"] { --navigator-icon: url(sample-code.svg); }
+        &[data-type="struct"] { --navigator-icon: url(structure.svg); }
+        &[data-type="subscript"] { --navigator-icon: url(subscript.svg); }
+        &[data-type="typealias"] { --navigator-icon: url(type-alias.svg); }
+        &[data-type="union"] { --navigator-icon: url(union.svg); }
+        &[data-type="var"] { --navigator-icon: url(variable.svg); }
+        
+        &:before {
+          content: "";
+          display: inline-block;
+          width: 1em;
+          height: 1em;
+          margin-inline-end: 7px;
+          margin-top: calc((25px - 1em) / 2);
+          vertical-align: top;
+          background: var(--navigator-icon, url(api-collection.svg)) no-repeat center / contain;
+        }
       }
       
       h3 {
@@ -1367,6 +1423,14 @@ figcaption {
       title.href = hrefForPath(item.path);
     }
     title.textContent = item.title;
+    if (!isGroupMarker) {
+      // The style sheet displays the icon for the item's type, unless the page has its own icon image.
+      title.dataset.type = item.type;
+      const imageURL = index.references?.[item.icon]?.variants?.[0]?.url;
+      if (imageURL) {
+        title.style.setProperty("--navigator-icon", `url(${JSON.stringify(pathToRoot + imageURL.slice(1))})`);
+      }
+    }
     
     const row = document.createElement("li");
     if (isGroupMarker || !item.children?.length) {
@@ -1504,6 +1568,176 @@ figcaption {
     static let moduleIcon = File(filename: "module.svg", data: Data("""
 <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="15px" height="15px" viewBox="0 0 14 14" fill="#666">
   <path d="M3.39,9l3.16,1.84.47.28.47-.28L10.61,9l.45.26,1.08.63L7,12.91l-5.16-3,1.08-.64L3.39,9M7,0,0,4.1,2.47,5.55,0,7,2.47,8.44,0,9.9,7,14l7-4.1L11.53,8.45,14,7,11.53,5.56,14,4.1ZM7,7.12,5.87,6.45l-1.54-.9L3.39,5,1.85,4.1,7,1.08l5.17,3L10.6,5l-.93.55-1.54.91ZM7,10,3.39,7.9,1.85,7,3.4,6.09,4.94,7,7,8.2,9.06,7,10.6,6.1,12.15,7l-1.55.9Z"/>
+</svg>
+""".utf8))
+
+    /// The icon that the navigator sidebar displays for classes.
+    static let classIcon = File(filename: "class.svg", data: Data("""
+<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="16px" height="16px" viewBox="0 0 16 16">
+  <rect x="1" y="1" width="14" height="14" fill="none" stroke="#666"/>
+  <text x="49%" y="12" fill="#666" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle">C</text>
+</svg>
+""".utf8))
+
+    /// The icon that the navigator sidebar displays for dictionaries.
+    static let dictionaryIcon = File(filename: "dictionary.svg", data: Data("""
+<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="16px" height="16px" viewBox="0 0 16 16">
+  <rect x="1" y="1" width="14" height="14" fill="none" stroke="#666"/>
+  <text x="49%" y="12" fill="#666" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle">O</text>
+</svg>
+""".utf8))
+
+    /// The icon that the navigator sidebar displays for enumerations, their cases, and HTTP requests.
+    static let enumerationIcon = File(filename: "enumeration.svg", data: Data("""
+<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="16px" height="16px" viewBox="0 0 16 16">
+  <rect x="1" y="1" width="14" height="14" fill="none" stroke="#666"/>
+  <text x="49%" y="12" fill="#666" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle">E</text>
+</svg>
+""".utf8))
+
+    /// The icon that the navigator sidebar displays for extensions.
+    static let extensionIcon = File(filename: "extension.svg", data: Data("""
+<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="16px" height="16px" viewBox="0 0 16 16">
+  <rect x="1.5" y="1.5" width="13" height="13" fill="none" stroke="#666"/>
+  <text x="2.7" y="12" fill="#666" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="11" font-weight="bold">E</text>
+  <text x="9.2" y="12" fill="#666" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="8" font-weight="bold">x</text>
+</svg>
+""".utf8))
+
+    /// The icon that the navigator sidebar displays for functions.
+    static let functionIcon = File(filename: "function.svg", data: Data("""
+<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="14px" height="14px" viewBox="0 0 14 14" fill="#666">
+  <path d="M13 1v12h-12v-12zM12.077 1.923h-10.154v10.154h10.154z"/>
+  <path d="M5.191 9.529c0.044 0.002 0.089 0.004 0.133 0.004 0.108 0 0.196-0.025 0.262-0.074s0.122-0.113 0.166-0.188c0.044-0.077 0.078-0.159 0.103-0.247s0.049-0.173 0.074-0.251l0.598-2.186h-0.709l0.207-0.702h0.702l0.288-1.086c0.083-0.384 0.256-0.667 0.517-0.849s0.591-0.273 0.99-0.273c0.108 0 0.212 0.007 0.314 0.022s0.203 0.027 0.306 0.037l-0.207 0.761c-0.054-0.006-0.106-0.011-0.155-0.018s-0.102-0.011-0.155-0.011c-0.108 0-0.196 0.016-0.262 0.048s-0.122 0.075-0.166 0.129-0.080 0.115-0.107 0.185c-0.028 0.068-0.055 0.14-0.085 0.214l-0.222 0.842h0.768l-0.192 0.702h-0.783l-0.628 2.319c-0.059 0.222-0.129 0.419-0.21 0.594s-0.182 0.322-0.303 0.443-0.269 0.214-0.443 0.281-0.385 0.1-0.631 0.1c-0.084 0-0.168-0.004-0.251-0.011s-0.168-0.014-0.251-0.018l0.207-0.768c0.040 0 0.081 0.001 0.126 0.004z"/>
+</svg>
+""".utf8))
+
+    /// The icon that the navigator sidebar displays for tutorial overviews and resources.
+    static let learnIcon = File(filename: "learn.svg", data: Data("""
+<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="14px" height="14px" viewBox="0 0 14 14" fill="#666">
+  <path d="M0 0.948h2.8v2.8h-2.8z"/>
+  <path d="M11.2 10.252h2.8v2.8h-2.8z"/>
+  <path d="M6.533 1.852h0.933v10.267h-0.933z"/>
+  <path d="M2.8 1.852h4.667v0.933h-4.667z"/>
+  <path d="M6.533 11.186h4.667v0.933h-4.667z"/>
+</svg>
+""".utf8))
+
+    /// The icon that the navigator sidebar displays for macros.
+    static let macroIcon = File(filename: "macro.svg", data: Data("""
+<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="16px" height="16px" viewBox="0 0 16 16">
+  <rect x="1" y="1" width="14" height="14" fill="none" stroke="#666"/>
+  <text x="49%" y="12" fill="#666" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle">#</text>
+</svg>
+""".utf8))
+
+    /// The icon that the navigator sidebar displays for methods and initializers.
+    static let methodIcon = File(filename: "method.svg", data: Data("""
+<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="16px" height="16px" viewBox="0 0 16 16">
+  <rect x="1" y="1" width="14" height="14" fill="none" stroke="#666"/>
+  <text x="49%" y="12" fill="#666" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle">M</text>
+</svg>
+""".utf8))
+
+    /// The icon that the navigator sidebar displays for namespaces.
+    static let namespaceIcon = File(filename: "namespace.svg", data: Data("""
+<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="16px" height="16px" viewBox="0 0 16 16">
+  <rect x="1" y="1" width="14" height="14" fill="none" stroke="#666"/>
+  <text x="49%" y="12" fill="#666" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle">N</text>
+</svg>
+""".utf8))
+
+    /// The icon that the navigator sidebar displays for operators.
+    static let operatorIcon = File(filename: "operator.svg", data: Data("""
+<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="14px" height="14px" viewBox="0 0 14 14" fill="#666">
+  <path d="M13 13h-12v-12h12zM1.923 12.077h10.154v-10.154h-10.154z"/>
+  <path d="M5.098 4.968v-1.477h-0.738v1.477h-1.477v0.738h1.477v1.477h0.738v-1.477h1.477v-0.738z"/>
+  <path d="M8.030 4.807l-2.031 5.538h0.831l2.031-5.538z"/>
+  <path d="M8.894 8.805v0.923h2.215v-0.923z"/>
+</svg>
+""".utf8))
+
+    /// The icon that the navigator sidebar displays for properties.
+    static let propertyIcon = File(filename: "property.svg", data: Data("""
+<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="16px" height="16px" viewBox="0 0 16 16">
+  <rect x="1" y="1" width="14" height="14" fill="none" stroke="#666"/>
+  <text x="49%" y="12" fill="#666" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle">P</text>
+</svg>
+""".utf8))
+
+    /// The icon that the navigator sidebar displays for property list keys.
+    static let propertyListKeyIcon = File(filename: "property-list-key.svg", data: Data("""
+<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="16px" height="16px" viewBox="0 0 16 16">
+  <rect x="1" y="1" width="14" height="14" fill="none" stroke="#666"/>
+  <text x="49%" y="12" fill="#666" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle">K</text>
+</svg>
+""".utf8))
+
+    /// The icon that the navigator sidebar displays for protocols.
+    static let protocolIcon = File(filename: "protocol.svg", data: Data("""
+<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="16px" height="16px" viewBox="0 0 16 16">
+  <rect x="1.5" y="1.5" width="13" height="13" fill="none" stroke="#666"/>
+  <text x="2.7" y="12" fill="#666" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="11" font-weight="bold">P</text>
+  <text x="9.2" y="12" fill="#666" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="8" font-weight="bold">r</text>
+</svg>
+""".utf8))
+
+    /// The icon that the navigator sidebar displays for sample code projects.
+    static let sampleCodeIcon = File(filename: "sample-code.svg", data: Data("""
+<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="14px" height="14px" viewBox="0 0 14 14" fill="#666">
+  <path d="M9.987 14h-0.814v-0.916h0.36c0.137 0 0.253-0.038 0.349-0.116 0.099-0.080 0.179-0.188 0.239-0.318 0.064-0.134 0.11-0.298 0.139-0.483 0.031-0.186 0.045-0.38 0.045-0.58v-2.115c0-0.417 0.046-0.781 0.139-1.083 0.092-0.3 0.2-0.554 0.322-0.754 0.127-0.203 0.246-0.353 0.366-0.458 0.087-0.076 0.155-0.131 0.207-0.169-0.052-0.037-0.12-0.093-0.207-0.167-0.12-0.105-0.239-0.255-0.366-0.459-0.122-0.2-0.23-0.453-0.322-0.754-0.093-0.3-0.139-0.665-0.139-1.082v-2.13c0-0.199-0.014-0.392-0.045-0.572-0.029-0.182-0.076-0.345-0.139-0.483-0.060-0.137-0.141-0.246-0.239-0.328-0.095-0.076-0.212-0.115-0.349-0.115h-0.36v-0.916h0.814c0.442 0 0.788 0.18 1.030 0.538 0.238 0.352 0.358 0.826 0.358 1.407v2.236c0 0.3 0.015 0.597 0.044 0.886 0.030 0.287 0.086 0.544 0.164 0.765 0.077 0.216 0.184 0.392 0.318 0.522 0.129 0.124 0.298 0.188 0.503 0.188h0.058v0.916h-0.058c-0.206 0-0.374 0.064-0.503 0.188-0.134 0.129-0.242 0.305-0.318 0.521-0.078 0.223-0.134 0.48-0.164 0.766-0.029 0.288-0.044 0.587-0.044 0.884v2.236c0 0.582-0.12 1.055-0.358 1.409-0.242 0.358-0.588 0.538-1.030 0.538z"/>
+  <path d="M4.827 14h-0.814c-0.442 0-0.788-0.18-1.030-0.538-0.238-0.352-0.358-0.825-0.358-1.409v-2.221c0-0.301-0.015-0.599-0.045-0.886-0.029-0.287-0.085-0.544-0.163-0.764-0.077-0.216-0.184-0.393-0.318-0.522-0.131-0.127-0.296-0.188-0.503-0.188h-0.058v-0.916h0.058c0.208 0 0.373-0.063 0.503-0.188 0.135-0.129 0.242-0.304 0.318-0.522 0.078-0.22 0.134-0.477 0.163-0.765 0.030-0.286 0.045-0.585 0.045-0.886v-2.251c0-0.582 0.12-1.055 0.358-1.407 0.242-0.358 0.588-0.538 1.030-0.538h0.814v0.916h-0.36c-0.138 0-0.252 0.038-0.349 0.116-0.099 0.079-0.179 0.189-0.239 0.327-0.064 0.139-0.11 0.302-0.141 0.483-0.029 0.18-0.044 0.373-0.044 0.572v2.13c0 0.417-0.046 0.782-0.138 1.082-0.092 0.302-0.201 0.556-0.324 0.754-0.123 0.201-0.246 0.356-0.366 0.459-0.086 0.074-0.153 0.13-0.206 0.167 0.052 0.038 0.12 0.093 0.206 0.169 0.12 0.103 0.243 0.258 0.366 0.458s0.232 0.453 0.324 0.754c0.092 0.302 0.138 0.666 0.138 1.083v2.115c0 0.2 0.015 0.394 0.044 0.58 0.030 0.186 0.077 0.349 0.139 0.482 0.062 0.132 0.142 0.239 0.241 0.32 0.096 0.079 0.21 0.116 0.349 0.116h0.36z"/>
+</svg>
+""".utf8))
+
+    /// The icon that the navigator sidebar displays for structures.
+    static let structureIcon = File(filename: "structure.svg", data: Data("""
+<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="16px" height="16px" viewBox="0 0 16 16">
+  <rect x="1" y="1" width="14" height="14" fill="none" stroke="#666"/>
+  <text x="49%" y="12" fill="#666" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle">S</text>
+</svg>
+""".utf8))
+
+    /// The icon that the navigator sidebar displays for subscripts.
+    static let subscriptIcon = File(filename: "subscript.svg", data: Data("""
+<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="14px" height="14px" viewBox="0 0 14 14" fill="#666">
+  <path d="M13 13h-12v-12h12zM1.923 12.077h10.154v-10.154h-10.154z"/>
+  <path d="M4.133 3.633v6.738h1.938v-0.831h-0.923v-5.077h0.923v-0.831z"/>
+  <path d="M9.856 10.371v-6.738h-1.938v0.831h0.923v5.077h-0.923v0.831z"/>
+</svg>
+""".utf8))
+
+    /// The icon that the navigator sidebar displays for tutorials.
+    static let tutorialIcon = File(filename: "tutorial.svg", data: Data("""
+<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="14px" height="14px" viewBox="0 0 14 14" fill="#666">
+  <path d="M0.933 6.067h3.733v1.867h-3.733v-1.867z"/>
+  <path d="M0.933 1.867h3.733v1.867h-3.733v-1.867z"/>
+  <path d="M13.067 1.867v10.267h-7.467v-10.267zM12.133 2.8h-5.6v8.4h5.6z"/>
+  <path d="M0.933 10.267h3.733v1.867h-3.733v-1.867z"/>
+</svg>
+""".utf8))
+
+    /// The icon that the navigator sidebar displays for type aliases.
+    static let typeAliasIcon = File(filename: "type-alias.svg", data: Data("""
+<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="16px" height="16px" viewBox="0 0 16 16">
+  <rect x="1" y="1" width="14" height="14" fill="none" stroke="#666"/>
+  <text x="49%" y="12" fill="#666" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle">T</text>
+</svg>
+""".utf8))
+
+    /// The icon that the navigator sidebar displays for unions.
+    static let unionIcon = File(filename: "union.svg", data: Data("""
+<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="16px" height="16px" viewBox="0 0 16 16">
+  <rect x="1" y="1" width="14" height="14" fill="none" stroke="#666"/>
+  <text x="49%" y="12" fill="#666" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle">U</text>
+</svg>
+""".utf8))
+
+    /// The icon that the navigator sidebar displays for variables.
+    static let variableIcon = File(filename: "variable.svg", data: Data("""
+<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="16px" height="16px" viewBox="0 0 16 16">
+  <rect x="1" y="1" width="14" height="14" fill="none" stroke="#666"/>
+  <text x="49%" y="12" fill="#666" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle">V</text>
 </svg>
 """.utf8))
 
