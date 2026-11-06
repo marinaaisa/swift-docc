@@ -1149,8 +1149,15 @@ body > header {
       }
     }
     
+    /* The reader moves the focus between the titles with the arrow keys, and the focused title's row displays the focus ring. */
+    li:has(> :is(a, h3):focus-visible), summary:has(> a:focus-visible) {
+      outline: 4px solid rgba(0, 125, 250, 0.6);
+      outline-offset: -4px;
+    }
+    
     li {
       a, h3 {
+        outline: none;
         display: block;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -1486,9 +1493,39 @@ figcaption {
     return badge;
   }
   
+  // The functions that create the children of each item that has them, by the item's `<details>` element, until the item's children exist.
+  const childListMakers = new WeakMap();
+  
+  // Creates the item's children, unless it already has them.
+  function makeChildren(details) {
+    const makeChildList = childListMakers.get(details);
+    if (makeChildList) {
+      childListMakers.delete(details);
+      details.append(makeChildList());
+    }
+  }
+  
+  // Opens or closes an item, which creates the item's children the first time it opens.
+  function setOpen(details, shouldOpen) {
+    if (shouldOpen) {
+      makeChildren(details);
+    }
+    details.open = shouldOpen;
+  }
+  
+  // Opens or closes an item and all the items inside it.
+  function setFullTreeOpen(details, shouldOpen) {
+    setOpen(details, shouldOpen);
+    for (const child of details.querySelectorAll(":scope > ul > li > details")) {
+      setFullTreeOpen(child, shouldOpen);
+    }
+  }
+  
+  let labelCount = 0;
+  
   // Each item is a list item with a link to its page, or with a heading for a group of pages.
   // An item with children holds a `<details>` element whose `<summary>` holds the link, and the script creates the item's children the first time it opens, so that large hierarchies stay fast.
-  function makeRow(item, depth, isInBetaItem) {
+  function makeRow(item, depth, isInBetaItem, position, siblingsCount, parentTitle) {
     const isGroupMarker = item.type === "groupMarker";
     
     const title = document.createElement(isGroupMarker ? "h3" : "a");
@@ -1496,6 +1533,16 @@ figcaption {
       title.href = hrefForPath(item.path);
     }
     title.textContent = item.title;
+    // The reader moves the focus between the titles with the arrow keys, and the Tab key only stops at one of them.
+    title.tabIndex = -1;
+    // Each title describes its position among its siblings to screen readers.
+    const label = document.createElement("span");
+    label.hidden = true;
+    label.id = `navigator-label-${labelCount++}`;
+    const childrenCount = isGroupMarker ? 0 : item.children?.length ?? 0;
+    label.textContent = `${position + 1} of ${siblingsCount} symbols inside ${parentTitle}`
+      + (childrenCount ? ` containing ${childrenCount === 1 ? "one symbol" : `${childrenCount} symbols`}` : "");
+    title.setAttribute("aria-describedby", `${label.id} navigator-usage`);
     // The active item can be an ancestor of the current page, when the page isn't in the navigator.
     if (item === activePath.at(-1) && item.path?.toLowerCase() === currentPath) {
       title.setAttribute("aria-current", "page");
@@ -1514,32 +1561,41 @@ figcaption {
     
     const row = document.createElement("li");
     if (isGroupMarker || !item.children?.length) {
-      row.append(title, ...(badge ? [badge] : []));
+      row.append(label, title, ...(badge ? [badge] : []));
       return row;
     }
     
     const summary = document.createElement("summary");
+    // The summary's title has the focus instead of the summary.
+    summary.tabIndex = -1;
     summary.append(title, ...(badge ? [badge] : []));
     const details = document.createElement("details");
     details.append(summary);
+    childListMakers.set(details, () => makeList(item.children, depth + 1, isInBetaItem || item.beta, item.title));
+    details.addEventListener("toggle", () => {
+      if (details.open) {
+        makeChildren(details);
+        return;
+      }
+      // If the title that the reader can focus with the Tab key is inside the item, the item's own title takes its place.
+      const tabbableTitle = details.querySelector(':scope > ul [tabindex="0"]');
+      if (tabbableTitle) {
+        tabbableTitle.tabIndex = -1;
+        title.tabIndex = 0;
+      }
+    });
+    // The items leading to the active item, and the active item, start open with their children, so that the navigator can scroll to the active item.
     if (activeItems.has(item)) {
-      // The items leading to the active item, and the active item, start open with their children, so that the navigator can scroll to the active item.
-      details.append(makeList(item.children, depth + 1, isInBetaItem || item.beta));
-      details.open = true;
-    } else {
-      // The item starts closed, so its first "toggle" event comes after it opens.
-      details.addEventListener("toggle", () => {
-        details.append(makeList(item.children, depth + 1, isInBetaItem || item.beta));
-      }, { once: true });
+      setOpen(details, true);
     }
-    row.append(details);
+    row.append(label, details);
     return row;
   }
   
-  function makeList(items, depth, isInBetaItem) {
+  function makeList(items, depth, isInBetaItem, parentTitle) {
     const list = document.createElement("ul");
     list.style.setProperty("--depth", depth);
-    list.append(...items.map((item) => makeRow(item, depth, isInBetaItem)));
+    list.append(...items.map((item, position) => makeRow(item, depth, isInBetaItem, position, items.length, parentTitle)));
     return list;
   }
   
@@ -1555,7 +1611,11 @@ figcaption {
     technologyTitle.setAttribute("aria-current", "page");
   }
   
-  const list = makeList(rootModule.children, 0, rootModule.beta);
+  const list = makeList(rootModule.children, 0, rootModule.beta, rootModule.title);
+  const usageLabel = document.createElement("span");
+  usageLabel.hidden = true;
+  usageLabel.id = "navigator-usage";
+  usageLabel.textContent = "To navigate the symbols, press Up Arrow, Down Arrow, Left Arrow or Right Arrow";
   
   // Scrolls the current page's item into view, unless it's already visible.
   function scrollToActiveItem() {
@@ -1579,7 +1639,7 @@ figcaption {
   const navigator = document.createElement("nav");
   navigator.id = "navigator";
   navigator.setAttribute("aria-label", "Documentation Navigator");
-  navigator.append(head, technologyTitle, list);
+  navigator.append(head, technologyTitle, list, usageLabel);
   const container = document.querySelector("body > .full-width-container");
   const main = container.querySelector(":scope > main");
   main.before(navigator);
@@ -1587,6 +1647,74 @@ figcaption {
   const headerTitle = container.previousElementSibling.querySelector("h2");
   headerTitle.insertAdjacentHTML("beforebegin", `<button type="button" id="navigator-toggle" aria-controls="navigator" aria-label="Documentation Navigator"></button>`);
   const toggle = headerTitle.previousElementSibling;
+  
+  // Returns the `<details>` element of the title's item, if the item has children.
+  const detailsForTitle = (title) => title.parentElement.localName === "summary" ? title.parentElement.parentElement : null;
+  // Returns the title of the item that contains the title's item, if there is one.
+  const parentItemTitle = (title) => title.closest("ul").parentElement.querySelector(":scope > summary > a");
+  // The titles of the items inside open items, in the order that the navigator displays them.
+  const visibleTitles = () => [...list.querySelectorAll("a, h3")].filter((title) => title.checkVisibility());
+  
+  // The title that has the focus is the only title that the reader can focus with the Tab key.
+  // When an item's summary gets the focus, for example when the reader clicks its chevron, its title gets the focus instead.
+  list.addEventListener("focusin", (event) => {
+    if (event.target.localName === "summary") {
+      event.target.querySelector(":scope > a").focus({ preventScroll: true });
+      return;
+    }
+    list.querySelector('[tabindex="0"]')?.setAttribute("tabindex", "-1");
+    event.target.tabIndex = 0;
+    event.target.closest("summary, li").scrollIntoView({ block: "nearest" });
+  });
+  
+  list.addEventListener("keydown", (event) => {
+    const title = event.target.closest("a, h3");
+    if (!title) {
+      return;
+    }
+    const details = detailsForTitle(title);
+    const hasModifiers = event.metaKey || event.ctrlKey || event.shiftKey;
+    const isDown = event.key === "ArrowDown";
+    switch (event.key) {
+      case "ArrowUp":
+      case "ArrowDown":
+        if (event.altKey || !hasModifiers) {
+          event.preventDefault();
+          // Option-Up and Option-Down move the focus to the first and last item.
+          const titles = visibleTitles();
+          titles[event.altKey ? (isDown ? titles.length - 1 : 0) : titles.indexOf(title) + (isDown ? 1 : -1)]?.focus({ preventScroll: true });
+        }
+        break;
+      case "ArrowLeft":
+        // Shortcuts like Command-Left, which goes back in the browser's history, keep working.
+        if (hasModifiers) {
+          break;
+        }
+        event.preventDefault();
+        // Close the item or, if it's already closed, move the focus to the item that contains it.
+        if (details?.open) {
+          setOpen(details, false);
+        } else {
+          parentItemTitle(title)?.focus({ preventScroll: true });
+        }
+        break;
+      case "ArrowRight":
+        if (hasModifiers) {
+          break;
+        }
+        event.preventDefault();
+        // Option-Right opens or closes the item and all the items inside it.
+        if (details && event.altKey) {
+          setFullTreeOpen(details, !details.open);
+        } else if (details) {
+          setOpen(details, true);
+        }
+        break;
+    }
+  });
+  
+  // The current page's item is the one that the reader can focus with the Tab key.
+  (list.querySelector('[aria-current="page"]') ?? list.querySelector("a, h3")).tabIndex = 0;
   
   // On wide screens the navigator is visible unless the reader hides it. On narrow screens it's hidden unless the reader opens it.
   const wideScreen = matchMedia("(min-width: 1024px)");
