@@ -1412,6 +1412,9 @@ figcaption {
     /// The script that renders the navigator sidebar from the navigator index and lets the reader show and hide it.
     package static let navigatorScript = File(filename: "navigator.js", data: Data("""
 // Renders the navigator sidebar from the navigator index in the output's "index/index.json" file.
+//
+// Each page is a separate document. To keep the navigator's state across pages,
+// this script stores which items are open, which item the reader clicked, and the scroll position in the session storage.
 (async () => {
   // The script reads its own element before it waits for the navigator index, because `document.currentScript` is only set until then.
   const script = document.currentScript;
@@ -1473,17 +1476,58 @@ figcaption {
   }
   
   // Follow the page's breadcrumbs, excluding the technology root, to find the current page in the location that it belongs.
-  const breadcrumbs = [...document.querySelectorAll("#breadcrumbs a[href]")].map((link) => indexPathForLink(link.href));
-  const activePath = [];
-  for (const path of [...breadcrumbs.slice(1), currentPath]) {
-    const items = activePath.length
-      ? (activePath.at(-1).children ?? []).filter((child) => child.path?.toLowerCase() === path).slice(0, 1)
-      : findItemPath(rootModule.children, path) ?? [];
-    if (!items.length) {
-      break;
+  function breadcrumbsActivePath() {
+    const breadcrumbs = [...document.querySelectorAll("#breadcrumbs a[href]")].map((link) => indexPathForLink(link.href));
+    const activePath = [];
+    for (const path of [...breadcrumbs.slice(1), currentPath]) {
+      const items = activePath.length
+        ? (activePath.at(-1).children ?? []).filter((child) => child.path?.toLowerCase() === path).slice(0, 1)
+        : findItemPath(rootModule.children, path) ?? [];
+      if (!items.length) {
+        break;
+      }
+      activePath.push(...items);
     }
-    activePath.push(...items);
+    return activePath;
   }
+  
+  // The previous page's state. Items are identified by their trail, the paths of the items leading to them and their own, from the top of the hierarchy.
+  // The key includes the output's location, so that outputs on the same origin don't share their state.
+  const storageKey = `docc.navigator.${rootURL.pathname}${technologyPath.slice(1)}`;
+  const restoredState = withStorage(() => JSON.parse(sessionStorage.getItem(storageKey))) ?? {};
+  
+  // Returns the items along a trail, if the navigator has all of them.
+  function itemsForTrail(trail) {
+    const items = [];
+    let candidates = rootModule.children;
+    for (const path of trail) {
+      const item = candidates.find((child) => child.path?.toLowerCase() === path);
+      if (!item) {
+        return null;
+      }
+      items.push(item);
+      candidates = item.children ?? [];
+    }
+    return items;
+  }
+  
+  // If the reader navigated from another item in the navigator, prefer that item, or one of its children, siblings, or the items leading to it,
+  // so that a page that's curated in more than one place stays in the location where the reader clicked it.
+  function restoredActivePath(trail) {
+    if (!Array.isArray(trail) || !trail.length) {
+      return null;
+    }
+    const candidates = [trail, [...trail, currentPath], [...trail.slice(0, -1), currentPath], ...trail.map((_, end) => trail.slice(0, end + 1))];
+    for (const candidate of candidates) {
+      const items = candidate.at(-1) === currentPath ? itemsForTrail(candidate) : null;
+      if (items) {
+        return items;
+      }
+    }
+    return null;
+  }
+  
+  const activePath = restoredActivePath(restoredState.activeTrail) ?? breadcrumbsActivePath();
   const activeItems = new Set(activePath);
   
   function makeBadge(variant) {
@@ -1713,6 +1757,17 @@ figcaption {
     }
   });
   
+  // Returns the trail of the item with the title.
+  function trailForTitle(title) {
+    const trail = [];
+    for (let row = title.closest("li"); row; row = row.parentElement.closest("li")) {
+      trail.unshift(indexPathForLink(row.querySelector(":scope > a, :scope > details > summary > a").href));
+    }
+    return trail;
+  }
+  
+  let clickedTrail = null;
+  
   // Option-clicking an item opens or closes it and all the items inside it, and Command-clicking an item's chevron opens or closes it and its siblings.
   list.addEventListener("click", (event) => {
     const row = event.target.closest("summary, li");
@@ -1726,6 +1781,9 @@ figcaption {
       for (const sibling of details.parentElement.parentElement.querySelectorAll(":scope > li > details")) {
         setOpen(sibling, shouldOpen);
       }
+    } else if (event.target.closest("a") && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+      // Remember which item the reader clicked, so that the next page displays it as the active item, even if the page is curated in more than one place.
+      clickedTrail = trailForTitle(event.target.closest("a"));
     }
   });
   
@@ -1740,6 +1798,31 @@ figcaption {
       }
     }
   });
+  
+  window.addEventListener("pagehide", () => withStorage(() => {
+    // The open items include the ones inside closed items, so that opening those items again on the next page brings back the same state.
+    const openItems = [...list.querySelectorAll("details[open] > summary > a")].map(trailForTitle);
+    const activeTrail = clickedTrail ?? activePath.map((item) => item.path.toLowerCase());
+    sessionStorage.setItem(storageKey, JSON.stringify({ openItems, activeTrail, scrollTop: list.scrollTop }));
+  }));
+  
+  // Keep the items that were open on the previous page open.
+  for (const trail of Array.isArray(restoredState.openItems) ? restoredState.openItems.filter(Array.isArray) : []) {
+    let container = list;
+    let details = null;
+    for (const path of trail) {
+      details = [...container.querySelectorAll(":scope > li > details")].find((candidate) => indexPathForLink(candidate.querySelector(":scope > summary > a").href) === path);
+      if (!details) {
+        break;
+      }
+      // The items leading to an open item stay open or closed as they were, but they need their children.
+      makeChildren(details);
+      container = details.querySelector(":scope > ul");
+    }
+    if (details) {
+      setOpen(details, true);
+    }
+  }
   
   // The current page's item is the one that the reader can focus with the Tab key.
   (list.querySelector('[aria-current="page"]') ?? list.querySelector("a, h3")).tabIndex = 0;
@@ -1801,6 +1884,8 @@ figcaption {
     }
   });
   
+  // Restore the previous page's scroll position so that the navigator doesn't jump, and then reveal the active item if it isn't visible.
+  list.scrollTop = restoredState.scrollTop ?? 0;
   updateToggle();
 })();
 
