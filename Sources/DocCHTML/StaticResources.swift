@@ -1285,9 +1285,14 @@ body > header {
 /* On wider screens, the navigator displays in a column next to the page's content, unless the reader hides it. */
 @media only screen and (min-width: 1024px) {
   #navigator {
-    /* A default width of 400px, but between 30% and 40% of the window width, up to a 1521px wide window. */
+    /*
+     The width is 400px, or 543px on wide windows, unless the reader resizes it,
+     but always between 30% and 40% of the window width, up to a 1521px wide window.
+     */
+    --navigator-default-width: 400px;
+    
     flex: none;
-    width: clamp(calc(min(100vw, 1521px) * 0.3), 400px, calc(min(100vw, 1521px) * 0.4));
+    width: clamp(calc(min(100vw, 1521px) * 0.3), var(--navigator-preferred-width, var(--navigator-default-width)), calc(min(100vw, 1521px) * 0.4));
     position: sticky;
     top: 52px;
     height: calc(100vh - 52px);
@@ -1297,7 +1302,7 @@ body > header {
   
   @media (min-width: 1521px) {
     #navigator {
-      width: 543px;
+      --navigator-default-width: 543px;
     }
   }
   
@@ -1307,6 +1312,33 @@ body > header {
     /* The navigator's border doesn't take up space either. */
     margin-inline-end: -1px;
     visibility: hidden;
+  }
+  
+  /* The handle on the navigator's edge that resizes it, which the navigator script adds */
+  #navigator .resize-handle {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0;
+    z-index: 1;
+    width: 5px;
+    transform: translateX(50%);
+    cursor: col-resize;
+    touch-action: none;
+    transition: background-color 0.15s;
+    
+    &:hover {
+      background: var(--color-fill-gray-tertiary);
+    }
+  }
+  
+  body.navigator-resizing * {
+    cursor: col-resize !important;
+    user-select: none;
+  }
+  
+  /* The navigator follows the pointer without a transition. */
+  body.navigator-resizing #navigator {
+    transition: none;
   }
 }
 
@@ -1881,6 +1913,58 @@ figcaption {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && document.body.classList.contains("navigator-open")) {
       setPanelOpen(false);
+    }
+  });
+  
+  // The reader can drag the navigator's edge to resize it, and drag it past half of its minimum width to hide it.
+  // The style sheet keeps the width between the minimum and maximum widths.
+  const widthStorageKey = "docc.navigator.width";
+  const setPreferredWidth = (width) => document.body.style.setProperty("--navigator-preferred-width", `${width}px`);
+  const storedWidth = Number(withStorage(() => localStorage.getItem(widthStorageKey)));
+  if (storedWidth > 0) {
+    setPreferredWidth(storedWidth);
+  }
+  
+  const resizeHandle = document.createElement("div");
+  resizeHandle.className = "resize-handle";
+  navigator.append(resizeHandle);
+  
+  // The width to restore when dragging the edge hides the navigator.
+  let widthBeforeResizing = "";
+  resizeHandle.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || !event.isPrimary) {
+      return;
+    }
+    event.preventDefault();
+    widthBeforeResizing = document.body.style.getPropertyValue("--navigator-preferred-width");
+    resizeHandle.setPointerCapture(event.pointerId);
+    document.body.classList.add("navigator-resizing");
+  });
+  resizeHandle.addEventListener("pointermove", (event) => {
+    if (!resizeHandle.hasPointerCapture(event.pointerId)) {
+      return;
+    }
+    const width = event.clientX - navigator.getBoundingClientRect().left;
+    if (width > Math.min(innerWidth, 1521) * 0.3 / 2) {
+      setPreferredWidth(width);
+    } else {
+      // The navigator can only be resized when it's visible on a wide screen, where the button hides it.
+      document.body.classList.remove("navigator-resizing");
+      resizeHandle.releasePointerCapture(event.pointerId);
+      document.body.style.setProperty("--navigator-preferred-width", widthBeforeResizing);
+      toggle.click();
+    }
+  });
+  resizeHandle.addEventListener("lostpointercapture", () => {
+    // Dragging the edge past half of the minimum width already finished resizing, and hid the navigator.
+    if (!document.body.classList.contains("navigator-resizing")) {
+      return;
+    }
+    document.body.classList.remove("navigator-resizing");
+    // Keep the width that the style sheet limited the dragged width to.
+    if (navigator.offsetWidth) {
+      setPreferredWidth(navigator.offsetWidth);
+      withStorage(() => localStorage.setItem(widthStorageKey, navigator.offsetWidth));
     }
   });
   
