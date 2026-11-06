@@ -1066,6 +1066,10 @@ body > header {
       line-height: 23px;
     }
     
+    &[aria-current="page"] {
+      background: var(--color-fill-gray-quaternary);
+    }
+    
     &:hover {
       background: var(--color-navigator-item-hover);
     }
@@ -1111,6 +1115,12 @@ body > header {
     /* A row with a badge displays it after the title, which shortens with an ellipsis. */
     li:has(> a + span), summary:has(> a + span) {
       display: flex;
+    }
+    
+    /* The current page's row has a background, behind its title. */
+    li:has(> a[aria-current="page"]), summary:has(> a[aria-current="page"]) {
+      border-radius: 4px;
+      background: var(--color-fill-gray-quaternary);
     }
     
     summary {
@@ -1161,6 +1171,11 @@ body > header {
         
         &:is(:hover, :focus-visible):after {
           background: var(--color-navigator-item-hover);
+        }
+        
+        /* The current page and the items leading to it are bold. */
+        &[aria-current="page"], details:has([aria-current="page"]) > summary > & {
+          font-weight: 600;
         }
         
         /* The icon for the item's type. Each type's icon is an SVG file, so that a custom style sheet can replace it. Other types use the API collection icon. */
@@ -1436,6 +1451,34 @@ figcaption {
   }
   const technologyPath = rootModule.path.toLowerCase();
   
+  // Returns the first item with the path and the items leading to it, searching the items and their children depth first.
+  function findItemPath(items, path) {
+    for (const item of items) {
+      if (item.path?.toLowerCase() === path) {
+        return [item];
+      }
+      const childPath = findItemPath(item.children ?? [], path);
+      if (childPath) {
+        return [item, ...childPath];
+      }
+    }
+    return null;
+  }
+  
+  // Follow the page's breadcrumbs, excluding the technology root, to find the current page in the location that it belongs.
+  const breadcrumbs = [...document.querySelectorAll("#breadcrumbs a[href]")].map((link) => indexPathForLink(link.href));
+  const activePath = [];
+  for (const path of [...breadcrumbs.slice(1), currentPath]) {
+    const items = activePath.length
+      ? (activePath.at(-1).children ?? []).filter((child) => child.path?.toLowerCase() === path).slice(0, 1)
+      : findItemPath(rootModule.children, path) ?? [];
+    if (!items.length) {
+      break;
+    }
+    activePath.push(...items);
+  }
+  const activeItems = new Set(activePath);
+  
   function makeBadge(variant) {
     const badge = document.createElement("span");
     badge.className = variant;
@@ -1453,6 +1496,10 @@ figcaption {
       title.href = hrefForPath(item.path);
     }
     title.textContent = item.title;
+    // The active item can be an ancestor of the current page, when the page isn't in the navigator.
+    if (item === activePath.at(-1) && item.path?.toLowerCase() === currentPath) {
+      title.setAttribute("aria-current", "page");
+    }
     if (!isGroupMarker) {
       // The style sheet displays the icon for the item's type, unless the page has its own icon image.
       title.dataset.type = item.type;
@@ -1475,10 +1522,16 @@ figcaption {
     summary.append(title, ...(badge ? [badge] : []));
     const details = document.createElement("details");
     details.append(summary);
-    // The item starts closed, so its first "toggle" event comes after it opens.
-    details.addEventListener("toggle", () => {
+    if (activeItems.has(item)) {
+      // The items leading to the active item, and the active item, start open with their children, so that the navigator can scroll to the active item.
       details.append(makeList(item.children, depth + 1, isInBetaItem || item.beta));
-    }, { once: true });
+      details.open = true;
+    } else {
+      // The item starts closed, so its first "toggle" event comes after it opens.
+      details.addEventListener("toggle", () => {
+        details.append(makeList(item.children, depth + 1, isInBetaItem || item.beta));
+      }, { once: true });
+    }
     row.append(details);
     return row;
   }
@@ -1498,8 +1551,24 @@ figcaption {
   if (rootModule.beta) {
     technologyTitle.append(makeBadge("beta"));
   }
+  if (technologyPath === currentPath) {
+    technologyTitle.setAttribute("aria-current", "page");
+  }
   
   const list = makeList(rootModule.children, 0, rootModule.beta);
+  
+  // Scrolls the current page's item into view, unless it's already visible.
+  function scrollToActiveItem() {
+    const element = list.querySelector('[aria-current="page"]')?.closest("summary, li");
+    if (!element?.checkVisibility()) {
+      return;
+    }
+    const listBounds = list.getBoundingClientRect();
+    const elementBounds = element.getBoundingClientRect();
+    if (elementBounds.top < listBounds.top || elementBounds.bottom > listBounds.bottom) {
+      list.scrollTop += elementBounds.top - listBounds.top;
+    }
+  }
   
   // On narrow screens, the navigator has a title and a button that closes it.
   const head = document.createElement("header");
@@ -1528,6 +1597,9 @@ figcaption {
       ? !document.body.classList.contains("navigator-collapsed")
       : document.body.classList.contains("navigator-open");
     toggle.setAttribute("aria-expanded", isVisible);
+    if (isVisible) {
+      scrollToActiveItem();
+    }
   }
   
   document.body.classList.toggle("navigator-collapsed", withStorage(() => localStorage.getItem(collapsedStorageKey)) === "true");
