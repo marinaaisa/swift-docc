@@ -821,6 +821,8 @@ body > header {
   box-sizing: border-box;
   width: 100%;
   height: 52px;
+  /* On wide screens, center the header's content in at most 1920px, like the navigator and the page's content. */
+  padding-inline: max(0px, (100% - 1920px) / 2);
   z-index: 5;
   
   display: flex;
@@ -1071,15 +1073,24 @@ body > header {
   }
 }
 
-/* The navigator and the page's main content display next to each other. */
+/* The navigator and the page's main content display next to each other in a container that's at most 1920px wide. */
 .full-width-container {
   display: flex;
+  max-width: 1920px;
+  margin-inline: auto;
   
   > main {
     flex: 1;
     min-width: 0;
     /* Keep full-width backgrounds, like the hero section's, from drawing over the navigator */
     overflow-x: clip;
+  }
+}
+
+@media only screen and (min-width: 1920px) {
+  .full-width-container {
+    box-sizing: border-box;
+    border-inline: 1px solid var(--color-grid);
   }
 }
 
