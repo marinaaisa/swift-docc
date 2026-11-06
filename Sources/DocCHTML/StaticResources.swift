@@ -50,6 +50,7 @@ package enum StaticResources {
         anchorIcon,
         sidebarIcon,
         chevronIcon,
+        closeIcon,
     ]
     
     // MARK: Stylesheets
@@ -895,6 +896,33 @@ body > header {
   font-size: 17px;
   line-height: 25px;
   
+  .navigator-head {
+    display: none;
+    flex: none;
+    align-items: center;
+    height: 48px;
+    margin-inline: 20px;
+    
+    h2 {
+      flex: 1;
+      margin: 0;
+      padding: 0;
+      color: black;
+      font-size: 17px;
+      line-height: 17px;
+      font-weight: 600;
+    }
+    
+    button {
+      width: 19px;
+      height: 19px;
+      padding: 0;
+      border: none;
+      background: url(close.svg) no-repeat center / contain;
+      cursor: pointer;
+    }
+  }
+  
   .technology-title {
     display: flex;
     margin-inline: 20px;
@@ -1014,10 +1042,28 @@ body > header {
   }
 }
 
-/* On narrow screens, the navigator is hidden. */
+/* On narrow screens, the navigator is a panel over the page's content that the reader opens and closes. */
 @media only screen and (max-width: 1023px) {
-  #navigator, #navigator-toggle {
-    display: none;
+  #navigator {
+    position: fixed;
+    inset: 0;
+    z-index: 6;
+    padding-top: 0;
+    border-inline-end: none;
+    visibility: hidden;
+  }
+  
+  body.navigator-open #navigator {
+    visibility: visible;
+  }
+  
+  #navigator .navigator-head {
+    display: flex;
+  }
+  
+  /* Scrolling past the end of the panel's items doesn't scroll the page behind it. */
+  #navigator .scroller {
+    overscroll-behavior: contain;
   }
 }
 
@@ -1280,11 +1326,17 @@ figcaption {
   const scroller = document.createElement("div");
   scroller.className = "scroller";
   
+  // On narrow screens, the navigator has a title and a button that closes it.
+  const head = document.createElement("div");
+  head.className = "navigator-head";
+  head.innerHTML = `<h2>Documentation</h2><button type="button" aria-label="Close Documentation Navigator"></button>`;
+  const closeButton = head.lastChild;
+  
   // The navigator goes before the page's main content, in the container below the page's header, and the button that shows and hides the navigator goes in the header.
   const navigator = document.createElement("nav");
   navigator.id = "navigator";
   navigator.setAttribute("aria-label", "Documentation Navigator");
-  navigator.append(technologyTitle, scroller);
+  navigator.append(head, technologyTitle, scroller);
   const container = document.querySelector("body > .full-width-container");
   const main = container.querySelector(":scope > main");
   main.before(navigator);
@@ -1315,20 +1367,51 @@ figcaption {
   
   appendRows(scroller, getChildren(INDEX_ROOT_KEY));
   
-  // The navigator is visible unless the reader hides it.
+  // On wide screens the navigator is visible unless the reader hides it. On narrow screens it's hidden unless the reader opens it.
+  const wideScreen = matchMedia("(min-width: 1024px)");
   const collapsedStorageKey = "docc.navigator.collapsed";
   
   function updateToggle() {
-    const isVisible = !document.body.classList.contains("navigator-collapsed");
+    const isVisible = wideScreen.matches
+      ? !document.body.classList.contains("navigator-collapsed")
+      : document.body.classList.contains("navigator-open");
     toggle.setAttribute("aria-expanded", isVisible);
   }
   
   document.body.classList.toggle("navigator-collapsed", withStorage(() => localStorage.getItem(collapsedStorageKey)) === "true");
   
-  toggle.addEventListener("click", () => {
-    const isCollapsed = document.body.classList.toggle("navigator-collapsed");
-    withStorage(() => localStorage.setItem(collapsedStorageKey, isCollapsed));
+  // On narrow screens the navigator is a panel over the page, so the rest of the page is inert while the panel is open,
+  // the panel's close button has the focus when it opens, and the button that opened it has the focus when it closes.
+  function setPanelOpen(isOpen) {
+    const isChanging = document.body.classList.contains("navigator-open") !== isOpen;
+    document.body.classList.toggle("navigator-open", isOpen);
+    for (const element of [...document.body.children, main]) {
+      element.inert = isOpen && element !== container;
+    }
     updateToggle();
+    if (isChanging) {
+      (isOpen ? closeButton : toggle).focus();
+    }
+  }
+  
+  wideScreen.addEventListener("change", () => setPanelOpen(false));
+  
+  toggle.addEventListener("click", () => {
+    if (wideScreen.matches) {
+      const isCollapsed = document.body.classList.toggle("navigator-collapsed");
+      withStorage(() => localStorage.setItem(collapsedStorageKey, isCollapsed));
+      updateToggle();
+    } else {
+      setPanelOpen(!document.body.classList.contains("navigator-open"));
+    }
+  });
+  
+  closeButton.addEventListener("click", () => setPanelOpen(false));
+  
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && document.body.classList.contains("navigator-open")) {
+      setPanelOpen(false);
+    }
   });
   
   updateToggle();
@@ -1385,6 +1468,13 @@ figcaption {
     static let chevronIcon = File(filename: "chevron.svg", data: Data("""
 <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="10px" height="10px" viewBox="0 0 14 14">
   <path d="M2.964 1.366l0.649-0.76 7.426 6.343-7.423 6.445-0.655-0.755 6.545-5.683-6.542-5.59z"/>
+</svg>
+""".utf8))
+
+    /// The icon that DocC uses for the button to close the navigator sidebar on narrow screens.
+    static let closeIcon = File(filename: "close.svg", data: Data("""
+<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="19px" height="19px" viewBox="0 0 14 14">
+  <path d="M11.91 1l1.090 1.090-4.917 4.915 4.906 4.905-1.090 1.090-4.906-4.905-4.892 4.894-1.090-1.090 4.892-4.894-4.903-4.904 1.090-1.090 4.903 4.904z"/>
 </svg>
 """.utf8))
 
