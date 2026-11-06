@@ -49,6 +49,7 @@ package enum StaticResources {
         // UI element icons
         anchorIcon,
         sidebarIcon,
+        chevronIcon,
     ]
     
     // MARK: Stylesheets
@@ -909,6 +910,11 @@ body > header {
     min-height: 32px;
     padding-inline: 20px;
     
+    /* The tree toggle displays a chevron instead of the `<summary>` element's disclosure triangle. */
+    &::-webkit-details-marker {
+      display: none;
+    }
+    
     &:not(.is-group):hover .head-wrapper {
       background: var(--color-navigator-item-hover);
     }
@@ -925,8 +931,32 @@ body > header {
   }
   
   .depth-spacer {
+    position: relative;
     flex: 0 0 auto;
+    align-self: stretch;
     width: calc(var(--nesting-index) * 15px + 20px);
+  }
+  
+  .tree-toggle {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-inline-end: 5px;
+    cursor: pointer;
+  }
+  
+  .chevron {
+    width: 10px;
+    height: 10px;
+    background: url(chevron.svg) no-repeat center / contain;
+    transition: transform 0.15s ease-in;
+    
+    details[open] > .navigator-card-item & {
+      transform: rotate(90deg);
+    }
   }
   
   .title-container {
@@ -1138,16 +1168,24 @@ figcaption {
   const getChildren = (uid) => uid === INDEX_ROOT_KEY
     ? children.filter(({ parent }) => parent === INDEX_ROOT_KEY)
     : children[uid].childUIDs.map((child) => children[child]);
+  // Returns the item and all its descendants, depth first.
+  const getAllChildren = (uid) => [children[uid], ...children[uid].childUIDs.flatMap(getAllChildren)];
   
-  // Each item is a row with its title, which links to its page, or a heading for a group of pages.
+  // Each item is a row, a `<summary>` inside a `<details>` element for items with children, and a `<div>` for other items.
+  // The script only creates an item's children when the reader first opens it, so that large hierarchies stay fast.
+  // The script keeps an item's elements on the item, once it creates them.
+  const isOpen = (item) => !!item.details?.open;
+  
   function makeRow(item) {
     const isGroupMarker = item.type === "groupMarker";
+    const isParent = item.childUIDs.length > 0;
     
-    const row = document.createElement("div");
+    const row = document.createElement(isParent ? "summary" : "div");
     row.className = "navigator-card-item";
     row.classList.toggle("is-group", isGroupMarker);
     row.style.setProperty("--nesting-index", item.depth);
-    row.innerHTML = `<div class="head-wrapper"><div class="depth-spacer"></div><div class="title-container"></div></div>`;
+    row.dataset.uid = item.uid;
+    row.innerHTML = `<div class="head-wrapper"><div class="depth-spacer">${isParent ? `<span class="tree-toggle"><span class="chevron"></span></span>` : ""}</div><div class="title-container"></div></div>`;
     
     const titleContainer = row.querySelector(".title-container");
     
@@ -1158,10 +1196,44 @@ figcaption {
     }
     link.textContent = item.title;
     titleContainer.append(link);
-    return row;
+    
+    if (!isParent) {
+      return row;
+    }
+    item.details = document.createElement("details");
+    item.details.append(row);
+    return item.details;
   }
   
   const appendRows = (container, items) => container.append(...items.map(makeRow));
+  
+  // Opens or closes an item, which creates the item's children the first time it opens.
+  function setOpen(item, shouldOpen) {
+    const { details } = item;
+    if (!details) {
+      return;
+    }
+    if (shouldOpen && details.children.length === 1) {
+      appendRows(details, getChildren(item.uid));
+    }
+    details.open = shouldOpen;
+  }
+  
+  // Opens or closes an item and all of its children.
+  function setFullTreeOpen(item, shouldOpen) {
+    for (const descendant of getAllChildren(item.uid)) {
+      setOpen(descendant, shouldOpen);
+    }
+  }
+  
+  function toggleNode(item) {
+    if (!isOpen(item)) {
+      setOpen(item, true);
+    } else {
+      // Closing an item also closes all of its children.
+      setFullTreeOpen(item, false);
+    }
+  }
   
   const technologyTitle = document.createElement("a");
   technologyTitle.className = "technology-title";
@@ -1180,6 +1252,23 @@ figcaption {
   const container = document.querySelector("body > .full-width-container");
   const main = container.querySelector(":scope > main");
   main.before(navigator);
+  
+  const itemForEvent = (event) => children[event.target.closest(".navigator-card-item")?.dataset.uid];
+  scroller.addEventListener("click", (event) => {
+    const item = itemForEvent(event);
+    if (!item) {
+      return;
+    }
+    // Keyboards and assistive technologies activate a `<summary>` element with a click on the element itself.
+    const isTreeToggle = event.target.closest(".tree-toggle") || (event.target.localName === "summary" && event.detail === 0);
+    if (!event.target.closest(".leaf-link")) {
+      // The script toggles the items itself, rather than letting the `<summary>` element toggle them, to close their children.
+      event.preventDefault();
+    }
+    if (isTreeToggle) {
+      toggleNode(item);
+    }
+  });
   
   appendRows(scroller, getChildren(INDEX_ROOT_KEY));
 })();
@@ -1228,6 +1317,13 @@ figcaption {
 <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="16px" height="16px" viewBox="0 0 20 20" fill="#666">
   <path d="M19.34,4.88L15.12,.66c-.87-.87-2.3-.87-3.17,0l-3.55,3.56-1.38,1.38-1.4,1.4c-.47,.47-.68,1.09-.64,1.7,.02,.29,.09,.58,.21,.84,.11,.23,.24,.44,.43,.63l4.22,4.22h0l.53-.53,.53-.53h0l-4.22-4.22c-.29-.29-.29-.77,0-1.06l1.4-1.4,.91-.91,.58-.58,.55-.55,2.9-2.9c.29-.29,.77-.29,1.06,0l4.22,4.22c.29,.29,.29,.77,0,1.06l-2.9,2.9c.14,.24,.24,.49,.31,.75,.08,.32,.11,.64,.09,.96l3.55-3.55c.87-.87,.87-2.3,0-3.17Z"/>
   <path d="M14.41,9.82s0,0,0,0l-4.22-4.22h0l-.53,.53-.53,.53h0l4.22,4.22c.29,.29,.29,.77,0,1.06l-1.4,1.4-.91,.91-.58,.58-.55,.55h0l-2.9,2.9c-.29,.29-.77,.29-1.06,0L1.73,14.04c-.29-.29-.29-.77,0-1.06l2.9-2.9c-.14-.24-.24-.49-.31-.75-.08-.32-.11-.64-.09-.97L.68,11.93c-.87,.87-.87,2.3,0,3.17l4.22,4.22c.87,.87,2.3,.87,3.17,0l3.55-3.55,1.38-1.38,1.4-1.4c.47-.47,.68-1.09,.64-1.7-.02-.29-.09-.58-.21-.84-.11-.22-.24-.44-.43-.62Z"/>
+</svg>
+""".utf8))
+
+    /// The icon that DocC displays next to items in the navigator sidebar that have children, which rotates when the item opens.
+    static let chevronIcon = File(filename: "chevron.svg", data: Data("""
+<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="10px" height="10px" viewBox="0 0 14 14">
+  <path d="M2.964 1.366l0.649-0.76 7.426 6.343-7.423 6.445-0.655-0.755 6.545-5.683-6.542-5.59z"/>
 </svg>
 """.utf8))
 
