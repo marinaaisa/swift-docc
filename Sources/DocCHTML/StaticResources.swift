@@ -966,6 +966,10 @@ body > header {
       font-weight: 600;
     }
     
+    &[aria-current="page"] {
+      background: var(--color-fill-gray-quaternary);
+    }
+    
     &:hover {
       background: var(--color-navigator-item-hover);
     }
@@ -985,6 +989,10 @@ body > header {
     /* The tree toggle displays a chevron instead of the `<summary>` element's disclosure triangle. */
     &::-webkit-details-marker {
       display: none;
+    }
+    
+    &.active .head-wrapper {
+      background: var(--color-fill-gray-quaternary);
     }
     
     &:not(.is-group):hover .head-wrapper {
@@ -1087,6 +1095,10 @@ body > header {
     text-overflow: ellipsis;
     white-space: nowrap;
     text-decoration: none;
+    
+    &.bolded {
+      font-weight: 600;
+    }
     
     /* Make the entire row a click target for the link */
     &:after {
@@ -1356,6 +1368,8 @@ figcaption {
     : children[uid].childUIDs.map((child) => children[child]);
   // Returns the item and all its descendants, depth first.
   const getAllChildren = (uid) => [children[uid], ...children[uid].childUIDs.flatMap(getAllChildren)];
+  // Returns the item and all its ancestors, starting from the top-level ancestor.
+  const getParents = (uid) => children[uid] ? [...getParents(children[uid].parent), children[uid]] : [];
   
   function makeIcon(item) {
     const icon = document.createElement("div");
@@ -1379,6 +1393,26 @@ figcaption {
     return badge;
   }
   
+  // Returns the items for each path in a list of paths from the top of the hierarchy.
+  function pathsToFlatChildren(paths) {
+    const result = [];
+    let candidates = children;
+    for (const path of paths) {
+      const node = candidates.find((child) => child.path?.toLowerCase() === path);
+      if (!node) {
+        break;
+      }
+      result.push(node);
+      candidates = getChildren(node.uid);
+    }
+    return result;
+  }
+  
+  // Follow the page's breadcrumbs, excluding the technology root, to find the current page in the location that it belongs.
+  const breadcrumbs = [...document.querySelectorAll("#breadcrumbs a[href]")].map((link) => indexPathForLink(link.href));
+  const activeUID = pathsToFlatChildren([...breadcrumbs.slice(1), currentPath]).pop()?.uid ?? null;
+  const activePathUIDs = new Set(getParents(activeUID).map(({ uid }) => uid));
+  
   // Each item is a row, a `<summary>` inside a `<details>` element for items with children, and a `<div>` for other items.
   // The script only creates an item's children when the reader first opens it, so that large hierarchies stay fast.
   // The script keeps an item's elements on the item, once it creates them.
@@ -1391,6 +1425,7 @@ figcaption {
     const row = document.createElement(isParent ? "summary" : "div");
     row.className = "navigator-card-item";
     row.classList.toggle("is-group", isGroupMarker);
+    row.classList.toggle("active", item.uid === activeUID);
     row.style.setProperty("--nesting-index", item.depth);
     row.dataset.uid = item.uid;
     row.innerHTML = `<div class="head-wrapper"><div class="depth-spacer">${isParent ? `<span class="tree-toggle"><span class="chevron"></span></span>` : ""}</div><div class="title-container"></div></div>`;
@@ -1402,14 +1437,20 @@ figcaption {
     
     const link = document.createElement(isGroupMarker ? "h3" : "a");
     link.className = "leaf-link";
+    link.classList.toggle("bolded", activePathUIDs.has(item.uid));
     if (!isGroupMarker) {
       link.href = hrefForPath(item.path);
+    }
+    // The active item can be an ancestor of the current page, when the page isn't in the navigator.
+    if (item.uid === activeUID && item.path?.toLowerCase() === currentPath) {
+      link.setAttribute("aria-current", "page");
     }
     link.textContent = item.title;
     titleContainer.append(link);
     if (item.deprecated || item.beta) {
       titleContainer.append(makeBadge(item.deprecated ? "deprecated" : "beta"));
     }
+    item.row = row;
     
     if (!isParent) {
       return row;
@@ -1457,6 +1498,9 @@ figcaption {
   if (rootModule.beta) {
     technologyTitle.append(makeBadge("beta"));
   }
+  if (technologyPath === currentPath) {
+    technologyTitle.setAttribute("aria-current", "page");
+  }
   
   const scroller = document.createElement("div");
   scroller.className = "scroller";
@@ -1483,6 +1527,19 @@ figcaption {
   // The page's default header is right before the container, after any custom header. The button goes before its title, so that it isn't part of the heading.
   container.previousElementSibling.querySelector("h2").before(toggle);
   
+  // Scrolls the active item into view, unless it's already visible.
+  function scrollToActiveItem() {
+    const element = children[activeUID]?.row;
+    if (!element?.checkVisibility()) {
+      return;
+    }
+    const scrollerBounds = scroller.getBoundingClientRect();
+    const elementBounds = element.getBoundingClientRect();
+    if (elementBounds.top < scrollerBounds.top || elementBounds.bottom > scrollerBounds.bottom) {
+      scroller.scrollTop += elementBounds.top - scrollerBounds.top;
+    }
+  }
+  
   const itemForEvent = (event) => children[event.target.closest(".navigator-card-item")?.dataset.uid];
   scroller.addEventListener("click", (event) => {
     const item = itemForEvent(event);
@@ -1501,6 +1558,10 @@ figcaption {
   });
   
   appendRows(scroller, getChildren(INDEX_ROOT_KEY));
+  // Open the items leading to the active item, starting from the top-level item.
+  for (const uid of activePathUIDs) {
+    setOpen(children[uid], true);
+  }
   
   // On wide screens the navigator is visible unless the reader hides it. On narrow screens it's hidden unless the reader opens it.
   const wideScreen = matchMedia("(min-width: 1024px)");
@@ -1511,6 +1572,9 @@ figcaption {
       ? !document.body.classList.contains("navigator-collapsed")
       : document.body.classList.contains("navigator-open");
     toggle.setAttribute("aria-expanded", isVisible);
+    if (isVisible) {
+      scrollToActiveItem();
+    }
   }
   
   document.body.classList.toggle("navigator-collapsed", withStorage(() => localStorage.getItem(collapsedStorageKey)) === "true");
