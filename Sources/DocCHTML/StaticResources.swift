@@ -908,6 +908,7 @@ body > header {
  Its sizes are in pixels, computed for a 17px root font size.
  */
 #navigator {
+  --color-figure-orange: rgb(204, 51, 0);
   --color-navigator-item-hover: rgba(0, 0, 255, 0.05);
   
   box-sizing: border-box;
@@ -1104,6 +1105,22 @@ body > header {
     
     &:after {
       display: none;
+    }
+  }
+  
+  .badge {
+    margin: auto;
+    margin-inline-start: 5px;
+    padding: 2px 4px;
+    border-radius: 1px;
+    color: white;
+    background-color: var(--color-figure-gray-secondary);
+    font-size: 12px;
+    line-height: 16px;
+    white-space: nowrap;
+    
+    &.badge-deprecated {
+      background-color: var(--color-figure-orange);
     }
   }
 }
@@ -1317,20 +1334,22 @@ figcaption {
   
   // All the items, in the order that the navigator displays them. An item's position in this list is its unique identifier.
   const children = [];
-  function flattenNestedData(nodes, parent, depth) {
+  function flattenNestedData(nodes, parent, depth, parentBetaStatus) {
     nodes.forEach(({ children: nodeChildren, ...node }) => {
       Object.assign(node, {
         uid: children.length,
         parent: parent?.uid ?? INDEX_ROOT_KEY,
         depth,
         childUIDs: [],
+        // If the parent or the entire technology is marked as "Beta", the child elements don't get marked as "Beta".
+        beta: node.beta && !parentBetaStatus,
       });
       parent?.childUIDs.push(node.uid);
       children.push(node);
-      flattenNestedData(nodeChildren ?? [], node, depth + 1);
+      flattenNestedData(nodeChildren ?? [], node, depth + 1, parentBetaStatus || node.beta);
     });
   }
-  flattenNestedData(rootModule.children, null, 0);
+  flattenNestedData(rootModule.children, null, 0, rootModule.beta);
   
   const getChildren = (uid) => uid === INDEX_ROOT_KEY
     ? children.filter(({ parent }) => parent === INDEX_ROOT_KEY)
@@ -1351,6 +1370,13 @@ figcaption {
       icon.append(image);
     }
     return icon;
+  }
+  
+  function makeBadge(variant) {
+    const badge = document.createElement("span");
+    badge.className = `badge badge-${variant}`;
+    badge.textContent = variant === "deprecated" ? "Deprecated" : "Beta";
+    return badge;
   }
   
   // Each item is a row, a `<summary>` inside a `<details>` element for items with children, and a `<div>` for other items.
@@ -1381,6 +1407,9 @@ figcaption {
     }
     link.textContent = item.title;
     titleContainer.append(link);
+    if (item.deprecated || item.beta) {
+      titleContainer.append(makeBadge(item.deprecated ? "deprecated" : "beta"));
+    }
     
     if (!isParent) {
       return row;
@@ -1425,6 +1454,9 @@ figcaption {
   technologyTitle.href = hrefForPath(technologyPath);
   technologyTitle.innerHTML = `<h2></h2>`;
   technologyTitle.firstChild.textContent = rootModule.title;
+  if (rootModule.beta) {
+    technologyTitle.append(makeBadge("beta"));
+  }
   
   const scroller = document.createElement("div");
   scroller.className = "scroller";
