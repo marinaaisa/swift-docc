@@ -816,6 +816,11 @@ pre {
 }
 
 body > header {
+  /* The space between the header's edges and its content */
+  --header-inset: 22px;
+  /* The width of the sidebar icon before the header's title */
+  --header-icon-width: 30px;
+  
   position: sticky;
   top: 0;
   box-sizing: border-box;
@@ -842,12 +847,12 @@ body > header {
     margin-top: 0;
     
     &:before {
-      width: 30px;
+      width: var(--header-icon-width);
       display: inline-block;
       content: url(sidebar.svg)
     }
     
-    margin-left: 22px;
+    margin-left: var(--header-inset);
   }
   
   span {
@@ -856,7 +861,7 @@ body > header {
     font-size: 14px;
     display: inline-block;
     
-    margin-right: 22px;
+    margin-right: var(--header-inset);
   }
 }
 
