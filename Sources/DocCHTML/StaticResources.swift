@@ -1713,6 +1713,34 @@ figcaption {
     }
   });
   
+  // Option-clicking an item opens or closes it and all the items inside it, and Command-clicking an item's chevron opens or closes it and its siblings.
+  list.addEventListener("click", (event) => {
+    const row = event.target.closest("summary, li");
+    const details = row?.localName === "summary" ? row.parentElement : null;
+    if (event.altKey && details) {
+      event.preventDefault();
+      setFullTreeOpen(details, !details.open);
+    } else if (event.metaKey && event.target.localName === "summary") {
+      event.preventDefault();
+      const shouldOpen = !details.open;
+      for (const sibling of details.parentElement.parentElement.querySelectorAll(":scope > li > details")) {
+        setOpen(sibling, shouldOpen);
+      }
+    }
+  });
+  
+  // Option-clicking the module's title opens or closes all items.
+  let areAllItemsOpen = false;
+  technologyTitle.addEventListener("click", (event) => {
+    if (event.altKey) {
+      event.preventDefault();
+      areAllItemsOpen = !areAllItemsOpen;
+      for (const details of list.querySelectorAll(":scope > li > details")) {
+        setFullTreeOpen(details, areAllItemsOpen);
+      }
+    }
+  });
+  
   // The current page's item is the one that the reader can focus with the Tab key.
   (list.querySelector('[aria-current="page"]') ?? list.querySelector("a, h3")).tabIndex = 0;
   
