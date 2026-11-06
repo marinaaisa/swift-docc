@@ -1197,9 +1197,13 @@ body > header {
 /* On wider screens, the navigator displays in a column next to the page's content, unless the reader hides it. */
 @media only screen and (min-width: 1024px) {
   #navigator {
-    /* A default width of 400px, but between 30% and 40% of the window width, up to a 1521px wide window. */
+    /*
+     The width is 400px, or 543px on wide windows, unless the reader resizes it,
+     but always between 30% and 40% of the window width, up to a 1521px wide window.
+     */
+    --navigator-default-width: 400px;
     flex: none;
-    width: clamp(calc(min(100vw, 1521px) * 0.3), 400px, calc(min(100vw, 1521px) * 0.4));
+    width: clamp(calc(min(100vw, 1521px) * 0.3), var(--navigator-preferred-width, var(--navigator-default-width)), calc(min(100vw, 1521px) * 0.4));
     position: sticky;
     top: 52px;
     height: calc(100vh - 52px);
@@ -1208,7 +1212,7 @@ body > header {
   
   @media (min-width: 1521px) {
     #navigator {
-      width: 543px;
+      --navigator-default-width: 543px;
     }
   }
   
@@ -1220,6 +1224,33 @@ body > header {
     visibility: hidden;
     pointer-events: none;
     transition: width 0.3s ease-in, visibility 0s linear 0.3s;
+  }
+  
+  /* The handle on the navigator's edge that resizes it, which the navigator script adds */
+  #navigator .resize-handle {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0;
+    z-index: 1;
+    width: 5px;
+    transform: translateX(50%);
+    cursor: col-resize;
+    touch-action: none;
+    transition: background-color 0.15s;
+    
+    &:hover {
+      background: var(--color-fill-gray-tertiary);
+    }
+  }
+  
+  body.navigator-resizing * {
+    cursor: col-resize !important;
+    user-select: none;
+  }
+  
+  /* The navigator follows the pointer without a transition. */
+  body.navigator-resizing #navigator {
+    transition: none;
   }
 }
 
@@ -1305,6 +1336,9 @@ figcaption {
     /// The script that renders the navigator sidebar from the navigator index and lets the reader show and hide it.
     package static let navigatorScript = File(filename: "navigator.js", data: Data("""
 // Renders the navigator sidebar from the navigator index in the output's "index/index.json" file.
+//
+// Each page is a separate document. To keep the navigator's state across pages,
+// this script stores which items are open, which item the reader clicked, and the scroll position in the session storage.
 (async () => {
   // The script reads its own element before it waits for the navigator index, because `document.currentScript` is only set until then.
   const script = document.currentScript;
@@ -1411,6 +1445,12 @@ figcaption {
   
   // MARK: State
   
+  // The key includes the output's location, so that outputs on the same origin don't share their state.
+  const storageKey = `docc.navigator.${rootURL.pathname}${technologyPath.slice(1)}`;
+  const storedState = withStorage(() => JSON.parse(sessionStorage.getItem(storageKey)));
+  // The stored items are positions in the navigator's items, so state from an output with different items doesn't apply.
+  const restoredState = storedState?.itemCount === children.length ? storedState : {};
+  
   // Returns the items for each path in a list of paths from the top of the hierarchy.
   function pathsToFlatChildren(paths) {
     const result = [];
@@ -1426,9 +1466,27 @@ figcaption {
     return result;
   }
   
+  function findActiveUID(activePath, previousActiveUID) {
+    const matchesActivePage = (item) => item.path?.toLowerCase() === activePath.at(-1);
+    // If the reader navigated from another item in the navigator, prefer that item or one that's close to it.
+    if (children[previousActiveUID]) {
+      const match = [
+        children[previousActiveUID],
+        ...getChildren(previousActiveUID),
+        ...getSiblings(previousActiveUID),
+        ...getParents(previousActiveUID),
+      ].find(matchesActivePage);
+      if (match) {
+        return match.uid;
+      }
+    }
+    // Otherwise, search across the active path for the active item.
+    return pathsToFlatChildren(activePath).pop()?.uid ?? null;
+  }
+  
   // Follow the page's breadcrumbs, excluding the technology root, to find the current page in the location that it belongs.
   const breadcrumbs = [...document.querySelectorAll("#breadcrumbs a[href]")].map((link) => indexPathForLink(link.href));
-  const activeUID = pathsToFlatChildren([...breadcrumbs.slice(1), currentPath]).pop()?.uid ?? null;
+  let activeUID = findActiveUID([...breadcrumbs.slice(1), currentPath], restoredState.activeUID);
   const activePathUIDs = new Set(getParents(activeUID).map(({ uid }) => uid));
   let allNodesToggled = false;
   
@@ -1668,6 +1726,9 @@ figcaption {
       toggleSiblings(item);
     } else if (isTreeToggle && !hasOtherModifiers) {
       toggleNode(item);
+    } else if (event.target.closest("a.leaf-link") && !event.metaKey && !hasOtherModifiers) {
+      // Remember which item the reader clicked so that the next page displays it as the active item, even if the page is curated in more than one place.
+      activeUID = item.uid;
     }
   });
   
@@ -1678,12 +1739,21 @@ figcaption {
     }
   });
   
+  window.addEventListener("pagehide", () => withStorage(() => {
+    const openNodes = children.filter(isOpen).map(({ uid }) => uid);
+    sessionStorage.setItem(storageKey, JSON.stringify({ itemCount: children.length, openNodes, activeUID, scrollTop: scroller.scrollTop }));
+  }));
+  
   // MARK: Initial state
   
   appendRows(scroller, getChildren(INDEX_ROOT_KEY));
-  // Open the items leading to the active item, starting from the top-level item.
-  for (const uid of activePathUIDs) {
-    setOpen(children[uid], true);
+  // Keep the items that were open on the previous page open, and open the items leading to the active item.
+  // The items are in the order that the navigator displays them, so each item's parent opens before the item.
+  const restoredOpenUIDs = new Set(restoredState.openNodes);
+  for (const item of children) {
+    if (restoredOpenUIDs.has(item.uid) || activePathUIDs.has(item.uid)) {
+      setOpen(item, true);
+    }
   }
   // The active item is the one that the reader can focus with the Tab key.
   (children[activeUID]?.link ?? scroller.querySelector(".leaf-link")).tabIndex = 0;
@@ -1745,6 +1815,58 @@ figcaption {
     }
   });
   
+  // MARK: Resizing the navigator
+  
+  // The reader can drag the navigator's edge to resize it, and drag it past half of its minimum width to hide it.
+  // The style sheet keeps the width between the minimum and maximum widths.
+  const widthStorageKey = "docc.navigator.width";
+  const setPreferredWidth = (width) => document.body.style.setProperty("--navigator-preferred-width", `${width}px`);
+  const storedWidth = Number(withStorage(() => localStorage.getItem(widthStorageKey)));
+  if (storedWidth > 0) {
+    setPreferredWidth(storedWidth);
+  }
+  
+  const resizeHandle = document.createElement("div");
+  resizeHandle.className = "resize-handle";
+  navigator.append(resizeHandle);
+  
+  resizeHandle.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || !event.isPrimary) {
+      return;
+    }
+    event.preventDefault();
+    resizeHandle.setPointerCapture(event.pointerId);
+    document.body.classList.add("navigator-resizing");
+  });
+  resizeHandle.addEventListener("pointermove", (event) => {
+    if (!resizeHandle.hasPointerCapture(event.pointerId)) {
+      return;
+    }
+    const width = event.clientX - navigator.getBoundingClientRect().left;
+    if (width > Math.min(innerWidth, 1521) * 0.3 / 2) {
+      setPreferredWidth(width);
+    } else {
+      // The navigator can only be resized when it's visible on a wide screen, where the button hides it.
+      document.body.classList.remove("navigator-resizing");
+      resizeHandle.releasePointerCapture(event.pointerId);
+      toggle.click();
+    }
+  });
+  resizeHandle.addEventListener("lostpointercapture", () => {
+    // Dragging the edge past half of the minimum width already finished resizing, and hid the navigator.
+    if (!document.body.classList.contains("navigator-resizing")) {
+      return;
+    }
+    document.body.classList.remove("navigator-resizing");
+    // Keep the width that the style sheet limited the dragged width to.
+    if (navigator.offsetWidth) {
+      setPreferredWidth(navigator.offsetWidth);
+      withStorage(() => localStorage.setItem(widthStorageKey, navigator.offsetWidth));
+    }
+  });
+  
+  // Restore the previous page's scroll position so that the navigator doesn't jump, and then reveal the active item if it isn't visible.
+  scroller.scrollTop = restoredState.scrollTop ?? 0;
   updateToggle();
 })();
 
